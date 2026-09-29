@@ -198,6 +198,9 @@ class CarPlayController(
 
     /** Told when the iPhone starts or stops playing media; may run on any thread. */
     @Volatile var playbackListener: ((Boolean) -> Unit)? = null
+
+    /** Told when a new CarPlay session with the iPhone becomes active; may run on any thread. */
+    @Volatile var sessionActiveListener: (() -> Unit)? = null
     @Volatile private var hotspot: WirelessHotspotManager? = null
     @Volatile private var bonjour: CarPlayBonjour? = null
     @Volatile private var bluetoothSocket: BluetoothSocket? = null
@@ -233,8 +236,10 @@ class CarPlayController(
 
     private val sessionListener = object : AirPlaySessionListener {
         override fun onSessionActive(session: AirPlaySession) {
-            if (activeSession !== session) BydNavigationOutputs.start(appContext)
+            val started = activeSession !== session
+            if (started) BydNavigationOutputs.start(appContext)
             activeSession = session
+            if (started) sessionActiveListener?.invoke()
             debugLog(
                 "AirPlay session active controller=${session.controllerId ?: "unknown"} " +
                     "peer=${session.host}",

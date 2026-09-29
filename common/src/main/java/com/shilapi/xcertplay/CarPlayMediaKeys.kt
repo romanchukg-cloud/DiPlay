@@ -18,9 +18,10 @@ import com.shilapi.xcertplay.orchestration.CarPlayController
  * Steering-wheel and other hardware media buttons for CarPlay.
  *
  * Android delivers media keys to a media session; BYD picks the session of the audio-focus
- * owner. Once CarPlay plays music, DiPlay holds audio focus and an active session until the
- * CarPlay session ends, so play also works after a pause. Keys go to the iPhone as CarPlay media
- * HID presses ([CarPlayMediaButton]).
+ * owner. When CarPlay connects, DiPlay takes audio focus and an active session, as a car's own
+ * CarPlay does: the car's media pauses and the wheel controls CarPlay from the start, even while
+ * the iPhone is paused. Both are held until the CarPlay session ends. Keys go to the iPhone as
+ * CarPlay media HID presses ([CarPlayMediaButton]).
  */
 internal object CarPlayMediaKeys {
     private const val TAG = "DiPlay-MediaKeys"
@@ -32,6 +33,7 @@ internal object CarPlayMediaKeys {
     private var session: MediaSession? = null
     private var focusRequest: AudioFocusRequest? = null
     private var focusHeld = false
+    private var mediaActive = false
     private var appContext: Context? = null
 
     @Synchronized
@@ -40,6 +42,7 @@ internal object CarPlayMediaKeys {
         appContext = context.applicationContext
         controller = next
         next.playbackListener = ::onIphonePlaying
+        next.sessionActiveListener = ::onCarPlayConnected
     }
 
     /** Ends key handling for [expected]; a newer controller's state is left alone. */
@@ -47,6 +50,7 @@ internal object CarPlayMediaKeys {
     fun detach(expected: CarPlayController?) {
         if (expected == null || controller !== expected) return
         expected.playbackListener = null
+        expected.sessionActiveListener = null
         controller = null
         releaseLocked()
     }
@@ -54,6 +58,11 @@ internal object CarPlayMediaKeys {
     /** Called when CarPlay music starts or stops; may run on any thread. */
     fun onMediaAudioChanged(active: Boolean) {
         mainHandler.post { synchronized(this) { updateLocked(active) } }
+    }
+
+    /** A CarPlay session with the iPhone started; may run on any thread. */
+    fun onCarPlayConnected() {
+        mainHandler.post { synchronized(this) { takeKeysLocked() } }
     }
 
     /** The iPhone started or stopped playing; may run on any thread. */
@@ -73,13 +82,23 @@ internal object CarPlayMediaKeys {
     }
 
     private fun updateLocked(active: Boolean) {
+        mediaActive = active
+        if (active) takeKeysLocked() else publishStateLocked()
+    }
+
+    private fun takeKeysLocked() {
         val context = appContext ?: return
         if (controller == null) return
-        if (active && session == null) start(context) else if (active) regainFocusLocked()
+        if (session == null) start(context) else regainFocusLocked()
+        publishStateLocked()
+    }
+
+    // BYD turns its play/pause key into PLAY or PAUSE from this state; either way CarPlay toggles.
+    private fun publishStateLocked() {
         session?.setPlaybackState(
             PlaybackState.Builder()
                 .setActions(ACTIONS)
-                .setState(if (active) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
+                .setState(if (mediaActive) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
                 .build(),
         )
     }
@@ -118,6 +137,7 @@ internal object CarPlayMediaKeys {
         focusRequest?.let { request -> appContext?.getSystemService(AudioManager::class.java)?.abandonAudioFocusRequest(request) }
         focusRequest = null
         focusHeld = false
+        mediaActive = false
     }
 
     private fun send(index: Int, source: String) {
