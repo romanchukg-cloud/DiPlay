@@ -60,6 +60,12 @@ class DiPlayActivity : ComponentActivity() {
     private val bluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) choosePhone() else permissionHelp("Nearby devices", "Allow Nearby devices so DiPlay can connect to your paired iPhone.")
     }
+    private val locationPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) return@registerForActivityResult
+        AirPlayPersistence.saveLocationReportingEnabled(this, false)
+        render()
+        permissionHelp("Location", "Allow precise location so DiPlay can send the car's GPS position to your iPhone.")
+    }
     private val export = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
         if (uri != null) exportDiagnostics(uri)
     }
@@ -241,6 +247,15 @@ class DiPlayActivity : ComponentActivity() {
             toggle(card, "Right-hand drive", "Place CarPlay’s controls closer to the driver.", AirPlayPersistence.loadRightHandDrive(this)) { AirPlayPersistence.saveRightHandDrive(this, it) }
             toggle(card, "Full screen", "Hide the car’s system bars while CarPlay is open.", AirPlayPersistence.loadHideTopBar(this) && AirPlayPersistence.loadHideBottomBar(this)) {
                 AirPlayPersistence.saveHideTopBar(this, it); AirPlayPersistence.saveHideBottomBar(this, it)
+            }
+        }
+        section(content, "Location", R.drawable.ic_dp_navigation) { card ->
+            toggle(card, "Car GPS for iPhone",
+                "Send the car's position to the iPhone when it asks. Helps where the phone's own GPS is weak. Applies on the next connection.",
+                AirPlayPersistence.loadLocationReportingEnabled(this)) {
+                AirPlayPersistence.saveLocationReportingEnabled(this, it)
+                if (it && checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED)
+                    locationPermission.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
             }
         }
         if (com.shilapi.xcertplay.hud.BydOutputSettings.available(this)) section(content, "BYD navigation", R.drawable.ic_dp_navigation) { card ->
