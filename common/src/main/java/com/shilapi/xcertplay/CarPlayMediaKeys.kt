@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
+import android.media.AudioFormat
 import android.media.AudioManager
+import android.media.AudioTrack
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Handler
@@ -25,6 +27,8 @@ import com.shilapi.xcertplay.orchestration.CarPlayController
  */
 internal object CarPlayMediaKeys {
     private const val TAG = "DiPlay-MediaKeys"
+    private const val SILENCE_SAMPLE_RATE = 48_000
+    private const val SILENCE_MILLIS = 500L
     private const val ACTIONS = PlaybackState.ACTION_PLAY or PlaybackState.ACTION_PAUSE or
         PlaybackState.ACTION_PLAY_PAUSE or PlaybackState.ACTION_SKIP_TO_NEXT or PlaybackState.ACTION_SKIP_TO_PREVIOUS
 
@@ -34,6 +38,7 @@ internal object CarPlayMediaKeys {
     private var focusRequest: AudioFocusRequest? = null
     private var focusHeld = false
     private var mediaActive = false
+    private var claiming = false
     private var appContext: Context? = null
 
     @Synchronized
@@ -91,6 +96,48 @@ internal object CarPlayMediaKeys {
         if (controller == null) return
         if (session == null) start(context) else regainFocusLocked()
         publishStateLocked()
+        if (!mediaActive && focusHeld) playSilence()
+    }
+
+    // BYD's key handler sends play/pause to the player that last played, not to the focus owner, so
+    // with the iPhone paused the wheel would restart the car's radio. A moment of silence, reported
+    // as playing, makes CarPlay that player.
+    private fun playSilence() {
+        val frames = SILENCE_SAMPLE_RATE / 4
+        val track = runCatching {
+            AudioTrack.Builder()
+                .setAudioAttributes(
+                    AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build(),
+                )
+                .setAudioFormat(
+                    AudioFormat.Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(SILENCE_SAMPLE_RATE)
+                        .setChannelMask(AudioFormat.CHANNEL_OUT_MONO)
+                        .build(),
+                )
+                .setTransferMode(AudioTrack.MODE_STATIC)
+                .setBufferSizeInBytes(frames * 2)
+                .build()
+        }.getOrNull() ?: return
+        runCatching {
+            track.write(ShortArray(frames), 0, frames)
+            track.play()
+        }
+        claiming = true
+        publishStateLocked()
+        mainHandler.postDelayed({
+            runCatching { track.stop() }
+            track.release()
+            synchronized(this) {
+                claiming = false
+                publishStateLocked()
+            }
+        }, SILENCE_MILLIS)
+        Log.i(TAG, "media keys claimed with silence")
     }
 
     // BYD turns its play/pause key into PLAY or PAUSE from this state; either way CarPlay toggles.
@@ -98,7 +145,7 @@ internal object CarPlayMediaKeys {
         session?.setPlaybackState(
             PlaybackState.Builder()
                 .setActions(ACTIONS)
-                .setState(if (mediaActive) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
+                .setState(if (mediaActive || claiming) PlaybackState.STATE_PLAYING else PlaybackState.STATE_PAUSED, PlaybackState.PLAYBACK_POSITION_UNKNOWN, 1f)
                 .build(),
         )
     }
