@@ -12,6 +12,7 @@ import android.provider.Settings
 import android.util.Log
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.Surface
 import android.view.TextureView
 import android.view.View
@@ -25,13 +26,14 @@ import kotlin.math.abs
  * Lab: the dashboard map (CarPlay stream 111) as a floating card on the centre screen while DiPlay
  * is in the background; with Usage Access only over BYD's home or map home (see [HomeScreenMonitor]). A second decoder draws the
  * stream here, so the dashboard keeps its map. Needs "display over other apps"
- * (SYSTEM_ALERT_WINDOW). A tap opens CarPlay; dragging moves the card.
+ * (SYSTEM_ALERT_WINDOW). A tap opens CarPlay, dragging moves the card and pinching resizes it.
  */
 internal object CenterMapOverlay {
     const val TAG = "DiPlay-CenterMap"
     private const val SHOW_DELAY_MILLIS = 600L
     private const val RELEASE_DELAY_MILLIS = 1_000L
     private const val WIDTH_FRACTION = 0.36
+    private const val MIN_WIDTH_FRACTION = 0.25
 
     private val main = Handler(Looper.getMainLooper())
     private var root: View? = null
@@ -70,10 +72,15 @@ internal object CenterMapOverlay {
         if (!permitted(context)) return false
         val windows = context.getSystemService(WindowManager::class.java) ?: return false
         val metrics = context.resources.displayMetrics
-        val width = (metrics.widthPixels * WIDTH_FRACTION).toInt()
+        val screenWidth = metrics.widthPixels
+        val screenHeight = metrics.heightPixels
+        // The widest card that still fits the screen height; the stream itself is 1600x600.
+        val maxWidth = minOf(screenWidth, (screenHeight * aspect).toInt())
+        val minWidth = (screenWidth * MIN_WIDTH_FRACTION).toInt()
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val width = prefs.getInt(KEY_WIDTH, (screenWidth * WIDTH_FRACTION).toInt()).coerceIn(minWidth, maxWidth)
         val height = (width / aspect).toInt()
         val radius = 24f * metrics.density / 2
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val params = WindowManager.LayoutParams(
             width,
             height,
@@ -83,10 +90,10 @@ internal object CenterMapOverlay {
             PixelFormat.TRANSLUCENT,
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = prefs.getInt(KEY_X, metrics.widthPixels - width - (32 * metrics.density).toInt())
-                .coerceIn(0, (metrics.widthPixels - width).coerceAtLeast(0))
+            x = prefs.getInt(KEY_X, screenWidth - width - (32 * metrics.density).toInt())
+                .coerceIn(0, (screenWidth - width).coerceAtLeast(0))
             y = prefs.getInt(KEY_Y, (96 * metrics.density).toInt())
-                .coerceIn(0, (metrics.heightPixels - height).coerceAtLeast(0))
+                .coerceIn(0, (screenHeight - height).coerceAtLeast(0))
             title = "DiPlay centre map"
         }
         var surface: Surface? = null
@@ -126,24 +133,52 @@ internal object CenterMapOverlay {
         var startX = 0
         var startY = 0
         var dragging = false
+        var pinched = false // a second finger came down: no tap or drag until all fingers are up
+        var pinchWidth = 0f
+        // Pinching keeps the card's centre and its 8:3 shape.
+        val pinch = ScaleGestureDetector(context, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScaleBegin(detector: ScaleGestureDetector): Boolean {
+                pinchWidth = params.width.toFloat()
+                return true
+            }
+
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                pinchWidth = (pinchWidth * detector.scaleFactor).coerceIn(minWidth.toFloat(), maxWidth.toFloat())
+                val centerX = params.x + params.width / 2
+                val centerY = params.y + params.height / 2
+                params.width = pinchWidth.toInt()
+                params.height = (pinchWidth / aspect).toInt()
+                params.x = (centerX - params.width / 2).coerceIn(0, (screenWidth - params.width).coerceAtLeast(0))
+                params.y = (centerY - params.height / 2).coerceIn(0, (screenHeight - params.height).coerceAtLeast(0))
+                root?.let { runCatching { windows.updateViewLayout(it, params) } }
+                return true
+            }
+        })
         card.setOnTouchListener { view, event ->
+            pinch.onTouchEvent(event)
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
-                    downX = event.rawX; downY = event.rawY; startX = params.x; startY = params.y; dragging = false
+                    downX = event.rawX; downY = event.rawY; startX = params.x; startY = params.y
+                    dragging = false
+                    pinched = false
                 }
-                MotionEvent.ACTION_MOVE -> {
+                MotionEvent.ACTION_POINTER_DOWN -> pinched = true
+                MotionEvent.ACTION_MOVE -> if (!pinched) {
                     val dx = event.rawX - downX
                     val dy = event.rawY - downY
                     if (dragging || abs(dx) > slop || abs(dy) > slop) {
                         dragging = true
-                        params.x = (startX + dx).toInt().coerceIn(0, (metrics.widthPixels - width).coerceAtLeast(0))
-                        params.y = (startY + dy).toInt().coerceIn(0, (metrics.heightPixels - height).coerceAtLeast(0))
+                        params.x = (startX + dx).toInt().coerceIn(0, (screenWidth - params.width).coerceAtLeast(0))
+                        params.y = (startY + dy).toInt().coerceIn(0, (screenHeight - params.height).coerceAtLeast(0))
                         runCatching { windows.updateViewLayout(view, params) }
                     }
                 }
-                MotionEvent.ACTION_UP -> {
-                    if (dragging) prefs.edit().putInt(KEY_X, params.x).putInt(KEY_Y, params.y).apply()
-                    else onTap()
+                MotionEvent.ACTION_UP -> when {
+                    pinched || dragging -> {
+                        prefs.edit().putInt(KEY_X, params.x).putInt(KEY_Y, params.y).putInt(KEY_WIDTH, params.width).apply()
+                        if (pinched) Log.i(TAG, "card resized ${params.width}x${params.height}")
+                    }
+                    else -> onTap()
                 }
             }
             true
@@ -177,4 +212,5 @@ internal object CenterMapOverlay {
     private const val PREFS = "diplay_center_map_lab"
     private const val KEY_X = "x"
     private const val KEY_Y = "y"
+    private const val KEY_WIDTH = "width"
 }

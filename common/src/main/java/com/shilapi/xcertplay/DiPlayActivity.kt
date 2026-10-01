@@ -329,7 +329,7 @@ class DiPlayActivity : ComponentActivity() {
                 }
                 // Lab build only, so not translated.
                 toggle(card, "Dashboard map on the centre screen · lab",
-                    "While DiPlay is in the background, the dashboard map also shows as a card on BYD home and map home. Tap the card to open CarPlay; drag it to move it. Needs permission to draw over other apps; without Usage Access the card shows over every app.",
+                    "While DiPlay is in the background, the dashboard map also shows as a card on BYD home and map home. Tap the card to open CarPlay; drag it to move it; pinch it to resize it. Needs permission to draw over other apps; without Usage Access the card shows over every app.",
                     AirPlayPersistence.loadCenterMapOverlay(this)) {
                     AirPlayPersistence.saveCenterMapOverlay(this, it)
                     if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
