@@ -278,8 +278,12 @@ class CarPlayHostActivity : ComponentActivity() {
     private var detectedCluster = ClusterActivityState.Snapshot(null, false)
     // Keep one surface per layer alive, including while its map card is hidden.
     private val clusterLayers = mutableMapOf<Boolean, ClusterMapPresentation>()
-    // Lab: while the centre-screen card is up, a second decoder also draws stream 111 there.
-    private var centerMapSurface: Surface? = null
+    // Lab: copies of stream 111 (centre card, launcher maps) each get their own decoder in the sink.
+    private val mirrorSink: (String, Surface?) -> Unit = { key, surface -> sink?.setMirrorSurface(SCREEN_TYPE_ALT, key, surface) }
+    private val mirrorsChanged: () -> Unit = {
+        updateClusterMapShown()
+        if (MapMirrors.launcherShowsMap) CenterMapOverlay.hide()
+    }
     // With Usage Access the card shows only over a BYD home screen; null = not known (no monitor).
     private var homeMonitor: HomeScreenMonitor? = null
     private var homeScreenVisible: Boolean? = null
@@ -401,6 +405,9 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         CenterMapOverlay.requestShow = ::showCenterMap
+        MapMirrors.sink = mirrorSink
+        MapMirrors.onChanged = mirrorsChanged
+        NavigationWidgetUpdater.attach(applicationContext)
         languagePreferenceAtCreate = AppLocale.preference(this)
         if (intent.action == "android.hardware.usb.action.USB_DEVICE_ATTACHED") {
             AirPlayPersistence.saveWirelessEnabled(this, false)
@@ -643,7 +650,7 @@ class CarPlayHostActivity : ComponentActivity() {
         try {
             presentation.show()
             clusterPresentation = presentation
-            com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(true)
+            updateClusterMapShown()
             presentation.setStreamActive(SCREEN_TYPE_ALT in activeScreenStreamTypes)
             Log.i(ClusterMapPresentation.TAG, "cluster presentation shown display=${display.displayId} name=${display.name}")
             appendLog("Cluster map: presentation shown display=${display.displayId}")
@@ -768,6 +775,7 @@ class CarPlayHostActivity : ComponentActivity() {
     private fun showCenterMap() {
         if (isDestroyed || shuttingDown.get() || sink == null) return
         if (!AirPlayPersistence.loadCenterMapOverlay(this) || !AirPlayPersistence.loadClusterMapEnabled(this)) return
+        if (MapMirrors.launcherShowsMap) return // the launcher has the map on its own screen
         // Without the stream the card would stay black; it follows once the stream starts.
         if (SCREEN_TYPE_ALT !in activeScreenStreamTypes) return
         if (!CenterMapOverlay.permitted(this)) {
@@ -787,7 +795,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         if (CenterMapOverlay.shown) return
-        val shown = CenterMapOverlay.show(applicationContext, CENTER_MAP_ASPECT, ::onCenterMapSurface) {
+        val shown = CenterMapOverlay.show(applicationContext, MapMirrors.STREAM_ASPECT, ::onCenterMapSurface) {
             startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         appendLog("Centre map: card ${if (shown) "shown" else "failed"} streamActive=${SCREEN_TYPE_ALT in activeScreenStreamTypes}")
@@ -800,11 +808,13 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private fun onCenterMapSurface(surface: Surface?) {
-        centerMapSurface = surface
-        sink?.setMirrorSurface(SCREEN_TYPE_ALT, surface)
-        // The map pause must not stop the stream while the card shows it.
-        com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(surface == null && clusterPresentation != null)
+        MapMirrors.set(MapMirrors.CARD, surface)
         appendLog(if (surface != null) "Centre map: mirroring the dashboard stream" else "Centre map: mirror stopped")
+    }
+
+    // The dashboard map pause must not stop the stream while a copy of the map is on screen.
+    private fun updateClusterMapShown() {
+        com.shilapi.xcertplay.hud.BydNavigationOutputs.setClusterMapShown(clusterPresentation != null && !MapMirrors.any)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
@@ -829,6 +839,11 @@ class CarPlayHostActivity : ComponentActivity() {
         homeMonitor?.stop()
         CenterMapOverlay.hide()
         if (CenterMapOverlay.requestShow == (::showCenterMap)) CenterMapOverlay.requestShow = null
+        if (MapMirrors.sink === mirrorSink) {
+            MapMirrors.sink = null
+            MapMirrors.setStreamActive(false)
+        }
+        if (MapMirrors.onChanged === mirrorsChanged) MapMirrors.onChanged = null
         dismissClusterPresentation()
         mainHandler.removeCallbacks(applyDisplaySize)
         mainHandler.removeCallbacks(expireOldLogLines)
@@ -3132,6 +3147,7 @@ class CarPlayHostActivity : ComponentActivity() {
         displayDiagnosticAttempt = DisplayDiagnosticSnapshot.currentAttempt(this)
         controller = snapshot.controller
         sink = snapshot.sink
+        MapMirrors.reapply()
         CarPlayBackgroundSession.store(snapshot.controller, snapshot.sink, snapshot.width, snapshot.height, this) { completion ->
             runOnUiThread {
                 shutdown(false, "DiPlay disconnect", completion)
@@ -3216,7 +3232,7 @@ class CarPlayHostActivity : ComponentActivity() {
         sink = renderer
         currentSurface?.let(::attachSurface)
         clusterSurface?.let { renderer.setSurface(SCREEN_TYPE_ALT, it) }
-        centerMapSurface?.let { renderer.setMirrorSurface(SCREEN_TYPE_ALT, it) }
+        MapMirrors.reapply()
         val media = createMediaEngine(renderer)
         val pairings = AirPlayPersistence.loadPairings(this) { id, key ->
             AirPlayPersistence.savePairing(this, id, key)
@@ -3575,6 +3591,7 @@ class CarPlayHostActivity : ComponentActivity() {
                 Log.i(ClusterMapPresentation.TAG, "cluster stream active=$active")
                 appendLog("Cluster map: stream active=$active")
                 clusterPresentation?.setStreamActive(active)
+                MapMirrors.setStreamActive(active)
                 if (active) {
                     mainHandler.removeCallbacks(hideIdleCenterMap)
                     if (!CenterMapOverlay.shown) CenterMapOverlay.scheduleShow()
@@ -3721,7 +3738,6 @@ class CarPlayHostActivity : ComponentActivity() {
         const val TAG = "xcertplay-usb"
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
-        private const val CENTER_MAP_ASPECT = 8.0 / 3 // the dashboard stream, 1920x720 scaled
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L

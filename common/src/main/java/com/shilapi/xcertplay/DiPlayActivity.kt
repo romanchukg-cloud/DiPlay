@@ -337,6 +337,11 @@ class DiPlayActivity : ComponentActivity() {
                 card.addView(label(if (CenterMapOverlay.permitted(this)) "Draw over other apps: allowed"
                     else "Draw over other apps: not allowed. adb shell appops set $packageName SYSTEM_ALERT_WINDOW allow",
                     14, if (CenterMapOverlay.permitted(this)) MUTED else WARNING))
+                toggle(card, "Share the live map with other launchers · lab",
+                    "Launchers that support DiPlay can show the live dashboard map inside their own home screen. Off by default, because any app on the head unit could then ask for the map.",
+                    AirPlayPersistence.loadLauncherMapSharing(this)) {
+                    AirPlayPersistence.saveLauncherMapSharing(this, it)
+                }
                 card.addView(label(if (HomeScreenMonitor.hasAccess(this)) "Usage Access: allowed, the card shows only on BYD home"
                     else "Usage Access: not allowed, the card shows over every app. adb shell appops set $packageName GET_USAGE_STATS allow",
                     14, if (HomeScreenMonitor.hasAccess(this)) MUTED else WARNING))

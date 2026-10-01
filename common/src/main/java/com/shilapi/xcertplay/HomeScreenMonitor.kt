@@ -3,6 +3,8 @@ package com.shilapi.xcertplay
 import android.app.usage.UsageEvents
 import android.app.usage.UsageStatsManager
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.Handler
 import android.os.Looper
 import java.util.concurrent.Executors
@@ -10,9 +12,10 @@ import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.TimeUnit
 
 /**
- * Lab: whether a BYD home screen (the normal home, map home or MyCar) is in front, from the newest
- * resumed activity in the owner's Usage Access events. Overlays and panels are not activities, so
- * they leave the answer as it is.
+ * Lab: whether a home screen is in front (BYD's normal home, map home or MyCar, or whichever
+ * launcher is the default home, such as a third-party car launcher), from the newest resumed
+ * activity in the owner's Usage Access events. Overlays and panels are not activities, so they
+ * leave the answer as it is.
  */
 internal class HomeScreenMonitor(context: Context, private val onChange: (Boolean) -> Unit) {
     private val context = context.applicationContext
@@ -23,6 +26,7 @@ internal class HomeScreenMonitor(context: Context, private val onChange: (Boolea
     private var newestTime = 0L
     private var newestPackage: String? = null
     @Volatile private var reported: Boolean? = null
+    @Volatile private var homePackages = HOME_PACKAGES
 
     val running: Boolean get() = executor != null
 
@@ -33,6 +37,7 @@ internal class HomeScreenMonitor(context: Context, private val onChange: (Boolea
         newestTime = 0L
         newestPackage = null
         reported = null
+        homePackages = HOME_PACKAGES + listOfNotNull(defaultHome(context))
         executor = Executors.newSingleThreadScheduledExecutor { Thread(it, "diplay-home-monitor").apply { isDaemon = true } }
             .also { it.scheduleWithFixedDelay(::poll, 0, POLL_MILLIS, TimeUnit.MILLISECONDS) }
     }
@@ -58,7 +63,7 @@ internal class HomeScreenMonitor(context: Context, private val onChange: (Boolea
         }
         // Overlap, because events can arrive a little late.
         since = (now - OVERLAP_MILLIS).coerceAtLeast(since)
-        val visible = newestPackage in HOME_PACKAGES
+        val visible = newestPackage in homePackages
         if (visible != reported) {
             reported = visible
             main.post { if (executor != null) onChange(visible) }
@@ -74,5 +79,13 @@ internal class HomeScreenMonitor(context: Context, private val onChange: (Boolea
         val HOME_PACKAGES = setOf("com.android.launcher3", "com.byd.launchermap", "com.byd.naviauto", "com.byd.mycar")
 
         fun hasAccess(context: Context): Boolean = DiLink51ClusterMonitor.hasAccess(context)
+
+        /** The launcher Android uses as home now, unless that is the chooser or DiPlay itself. */
+        fun defaultHome(context: Context): String? = runCatching {
+            context.packageManager.resolveActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+                PackageManager.MATCH_DEFAULT_ONLY,
+            )?.activityInfo?.packageName
+        }.getOrNull()?.takeIf { it != "android" && it != context.packageName }
     }
 }

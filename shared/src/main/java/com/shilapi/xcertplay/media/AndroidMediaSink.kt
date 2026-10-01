@@ -156,10 +156,10 @@ class AndroidMediaSink(
     private val videoRecoveryHandlers = ConcurrentHashMap<Int, () -> Unit>()
     private val videoDiagnosticHandlers = ConcurrentHashMap<Int, (String) -> Unit>()
     private val recoveryPending = AtomicBoolean(false)
-    // Lab: a second decoder draws the same stream on another surface (the centre-screen card).
+    // Lab: extra decoders draw the same stream on other surfaces (the centre card, launcher maps).
     private val mirrorLock = Any()
-    private val mirrorSurfaces = HashMap<Int, Surface>()
-    private val mirrorDecoders = HashMap<Int, VideoDecoder>()
+    private val mirrorSurfaces = HashMap<Pair<Int, String>, Surface>()
+    private val mirrorDecoders = HashMap<Pair<Int, String>, VideoDecoder>()
     private val lastVideoConfig = ConcurrentHashMap<Int, Pair<VideoCodec, ByteArray>>()
     private val recoveryExecutor = Executors.newSingleThreadExecutor { task ->
         Thread(task, "carplay-video-recovery").apply { isDaemon = true }
@@ -194,24 +194,27 @@ class AndroidMediaSink(
     }
 
     /**
-     * Lab: also decodes stream [type] onto [surface] with its own decoder, which starts at the next
-     * keyframe it asks for; null stops it. The stream's own surface is not affected.
+     * Lab: also decodes stream [type] onto [surface] with its own decoder, one per [key], which
+     * starts at the next keyframe it asks for; null stops it. The stream's own surface is not affected.
      */
-    fun setMirrorSurface(type: Int, surface: Surface?) {
+    fun setMirrorSurface(type: Int, key: String, surface: Surface?) {
+        val id = type to key
         synchronized(mirrorLock) {
-            mirrorDecoders.remove(type)?.close()
+            mirrorDecoders.remove(id)?.close()
             if (surface == null) {
-                mirrorSurfaces.remove(type)
+                mirrorSurfaces.remove(id)
                 return
             }
-            mirrorSurfaces[type] = surface
+            mirrorSurfaces[id] = surface
         }
-        lastVideoConfig[type]?.let { (codec, data) -> mirrorDecoder(type)?.configure(codec, data) }
+        lastVideoConfig[type]?.let { (codec, data) -> mirrorDecoders(type).forEach { it.configure(codec, data) } }
     }
 
-    private fun mirrorDecoder(type: Int): VideoDecoder? = synchronized(mirrorLock) {
-        val surface = mirrorSurfaces[type] ?: return null
-        mirrorDecoders.getOrPut(type) { newVideoDecoder(type, surface, " stream=$type mirror") }
+    private fun mirrorDecoders(type: Int): List<VideoDecoder> = synchronized(mirrorLock) {
+        if (mirrorSurfaces.isEmpty()) return emptyList()
+        mirrorSurfaces.filterKeys { it.first == type }.map { (id, surface) ->
+            mirrorDecoders.getOrPut(id) { newVideoDecoder(type, surface, " stream=$type mirror=${id.second}") }
+        }
     }
 
     fun setScreenStreamActiveChangedListener(listener: ((Int, Boolean) -> Unit)?) {
@@ -229,12 +232,12 @@ class AndroidMediaSink(
         val codec = pendingVideoCodec[type] ?: VideoCodec.H264
         lastVideoConfig[type] = codec to codecData
         videoDecoder(type).configure(codec, codecData)
-        mirrorDecoder(type)?.configure(codec, codecData)
+        mirrorDecoders(type).forEach { it.configure(codec, codecData) }
     }
 
     override fun onVideoFrame(type: Int, naluBytes: ByteArray) {
         videoDecoder(type).submit(naluBytes)
-        mirrorDecoder(type)?.submit(naluBytes)
+        mirrorDecoders(type).forEach { it.submit(naluBytes) }
     }
 
     override fun onScreenStreamActive(type: Int, active: Boolean) {
@@ -242,7 +245,9 @@ class AndroidMediaSink(
             videoRecoveryHandlers.remove(type)
             videoDiagnosticHandlers.remove(type)
             videoDecoders.remove(type)?.close()
-            synchronized(mirrorLock) { mirrorDecoders.remove(type)?.close() }
+            synchronized(mirrorLock) {
+                mirrorDecoders.keys.filter { it.first == type }.forEach { mirrorDecoders.remove(it)?.close() }
+            }
             lastVideoConfig.remove(type)
             pendingVideoCodec.remove(type)
         }
