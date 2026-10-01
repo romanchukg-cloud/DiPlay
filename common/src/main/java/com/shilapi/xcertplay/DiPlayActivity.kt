@@ -123,6 +123,23 @@ class DiPlayActivity : ComponentActivity() {
     }
     override fun onSaveInstanceState(outState: Bundle) { outState.putString("page", page); outState.putBoolean("pending_car_hotspot", pendingCarHotspotSetup); super.onSaveInstanceState(outState) }
     override fun onConfigurationChanged(newConfig: Configuration) { super.onConfigurationChanged(newConfig); render() }
+    private fun openOverlayPermission() {
+        val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName"))
+        if (runCatching { startActivity(intent) }.isFailure) {
+            android.widget.Toast.makeText(this, "No settings screen for this permission; use adb appops", android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        CenterMapOverlay.onDiPlayScreenShown()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isFinishing && !isChangingConfigurations) CenterMapOverlay.onDiPlayScreenHidden()
+    }
+
     override fun onResume() {
         super.onResume()
         if (Build.VERSION.SDK_INT < 33 && AppLocale.preference(this) != languagePreferenceAtCreate) {
@@ -310,6 +327,16 @@ class DiPlayActivity : ComponentActivity() {
                     AirPlayPersistence.saveClusterMapEnabled(this, it)
                     reconnectForClusterMap()
                 }
+                // Lab build only, so not translated.
+                toggle(card, "Dashboard map on the centre screen · lab",
+                    "While DiPlay is in the background, the dashboard map shows as a card over other apps, for example BYD home or map home. While the card is up, the dashboard does not show the map. Tap the card to open CarPlay; drag it to move it. Needs permission to draw over other apps.",
+                    AirPlayPersistence.loadCenterMapOverlay(this)) {
+                    AirPlayPersistence.saveCenterMapOverlay(this, it)
+                    if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
+                }
+                card.addView(label(if (CenterMapOverlay.permitted(this)) "Draw over other apps: allowed"
+                    else "Draw over other apps: not allowed. adb shell appops set $packageName SYSTEM_ALERT_WINDOW allow",
+                    14, if (CenterMapOverlay.permitted(this)) MUTED else WARNING))
                 if (DiLink51ClusterLayout.supported()) {
                     val automatic = DiLink51ClusterLayout.automatic(this)
                     toggle(card, getString(R.string.follow_instrument_theme_and_map_card),
