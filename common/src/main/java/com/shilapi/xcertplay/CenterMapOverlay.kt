@@ -23,8 +23,8 @@ import kotlin.math.abs
 
 /**
  * Lab: the dashboard map (CarPlay stream 111) as a floating card on the centre screen while DiPlay
- * is in the background, for example over BYD's home or map home. The stream has one surface, so
- * while the card is up the dashboard does not show the map. Needs "display over other apps"
+ * is in the background, for example over BYD's home or map home. A second decoder draws the
+ * stream here, so the dashboard keeps its map. Needs "display over other apps"
  * (SYSTEM_ALERT_WINDOW). A tap opens CarPlay; dragging moves the card.
  */
 internal object CenterMapOverlay {
@@ -42,8 +42,8 @@ internal object CenterMapOverlay {
 
     fun permitted(context: Context): Boolean = Settings.canDrawOverlays(context)
 
-    /** A DiPlay screen left the front; the card follows if nothing of DiPlay replaces it. */
-    fun onDiPlayScreenHidden() {
+    /** Shows the card shortly, unless a DiPlay screen is in front by then. */
+    fun scheduleShow() {
         main.removeCallbacks(showIfBackground)
         main.postDelayed(showIfBackground, SHOW_DELAY_MILLIS)
     }
@@ -101,8 +101,8 @@ internal object CenterMapOverlay {
                 override fun onSurfaceTextureUpdated(texture: SurfaceTexture) = Unit
 
                 override fun onSurfaceTextureDestroyed(texture: SurfaceTexture): Boolean {
-                    // Hand the stream back first; the decoder switches on its own thread, so the
-                    // old surface stays valid a little longer.
+                    // Stop the mirror first; its decoder stops on its own thread, so the old
+                    // surface stays valid a little longer.
                     onSurface(null)
                     val old = surface
                     surface = null

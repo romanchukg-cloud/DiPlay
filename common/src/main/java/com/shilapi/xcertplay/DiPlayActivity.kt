@@ -137,7 +137,7 @@ class DiPlayActivity : ComponentActivity() {
 
     override fun onStop() {
         super.onStop()
-        if (!isFinishing && !isChangingConfigurations) CenterMapOverlay.onDiPlayScreenHidden()
+        if (!isFinishing && !isChangingConfigurations) CenterMapOverlay.scheduleShow()
     }
 
     override fun onResume() {
@@ -329,7 +329,7 @@ class DiPlayActivity : ComponentActivity() {
                 }
                 // Lab build only, so not translated.
                 toggle(card, "Dashboard map on the centre screen · lab",
-                    "While DiPlay is in the background, the dashboard map shows as a card over other apps, for example BYD home or map home. While the card is up, the dashboard does not show the map. Tap the card to open CarPlay; drag it to move it. Needs permission to draw over other apps.",
+                    "While DiPlay is in the background, the dashboard map also shows as a card over other apps, for example BYD home or map home. Tap the card to open CarPlay; drag it to move it. Needs permission to draw over other apps.",
                     AirPlayPersistence.loadCenterMapOverlay(this)) {
                     AirPlayPersistence.saveCenterMapOverlay(this, it)
                     if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
