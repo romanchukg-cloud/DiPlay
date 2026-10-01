@@ -280,6 +280,9 @@ class CarPlayHostActivity : ComponentActivity() {
     private val clusterLayers = mutableMapOf<Boolean, ClusterMapPresentation>()
     // Lab: while the centre-screen card is up, a second decoder also draws stream 111 there.
     private var centerMapSurface: Surface? = null
+    // With Usage Access the card shows only over a BYD home screen; null = not known (no monitor).
+    private var homeMonitor: HomeScreenMonitor? = null
+    private var homeScreenVisible: Boolean? = null
     private val hideIdleCenterMap = Runnable {
         if (SCREEN_TYPE_ALT !in activeScreenStreamTypes) CenterMapOverlay.hide()
     }
@@ -751,6 +754,8 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onStart() {
         super.onStart()
         CenterMapOverlay.onDiPlayScreenShown()
+        homeMonitor?.stop()
+        homeScreenVisible = null
     }
 
     override fun onStop() {
@@ -769,10 +774,29 @@ class CarPlayHostActivity : ComponentActivity() {
             appendLog("Centre map: no permission to draw over other apps")
             return
         }
+        // Without Usage Access the card shows over any app, as before.
+        if (HomeScreenMonitor.hasAccess(this)) {
+            val monitor = homeMonitor ?: HomeScreenMonitor(this, ::onHomeScreenVisible).also { homeMonitor = it }
+            if (!monitor.running) {
+                monitor.start() // its first answer shows the card
+                return
+            }
+            if (homeScreenVisible != true) {
+                CenterMapOverlay.hide()
+                return
+            }
+        }
+        if (CenterMapOverlay.shown) return
         val shown = CenterMapOverlay.show(applicationContext, CENTER_MAP_ASPECT, ::onCenterMapSurface) {
             startActivity(Intent(this, CarPlayHostActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         appendLog("Centre map: card ${if (shown) "shown" else "failed"} streamActive=${SCREEN_TYPE_ALT in activeScreenStreamTypes}")
+    }
+
+    private fun onHomeScreenVisible(visible: Boolean) {
+        homeScreenVisible = visible
+        appendLog("Centre map: BYD home ${if (visible) "in front" else "not in front"}")
+        if (!visible) CenterMapOverlay.hide() else if (!CenterMapOverlay.diPlayInFront()) showCenterMap()
     }
 
     private fun onCenterMapSurface(surface: Surface?) {
@@ -802,6 +826,7 @@ class CarPlayHostActivity : ComponentActivity() {
     override fun onDestroy() {
         clusterMonitor?.stop()
         mainHandler.removeCallbacks(hideIdleCenterMap)
+        homeMonitor?.stop()
         CenterMapOverlay.hide()
         if (CenterMapOverlay.requestShow == (::showCenterMap)) CenterMapOverlay.requestShow = null
         dismissClusterPresentation()

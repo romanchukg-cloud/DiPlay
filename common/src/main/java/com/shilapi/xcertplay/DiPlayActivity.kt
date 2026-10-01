@@ -329,7 +329,7 @@ class DiPlayActivity : ComponentActivity() {
                 }
                 // Lab build only, so not translated.
                 toggle(card, "Dashboard map on the centre screen · lab",
-                    "While DiPlay is in the background, the dashboard map also shows as a card over other apps, for example BYD home or map home. Tap the card to open CarPlay; drag it to move it. Needs permission to draw over other apps.",
+                    "While DiPlay is in the background, the dashboard map also shows as a card on BYD home and map home. Tap the card to open CarPlay; drag it to move it. Needs permission to draw over other apps; without Usage Access the card shows over every app.",
                     AirPlayPersistence.loadCenterMapOverlay(this)) {
                     AirPlayPersistence.saveCenterMapOverlay(this, it)
                     if (it && !CenterMapOverlay.permitted(this)) openOverlayPermission()
@@ -337,6 +337,9 @@ class DiPlayActivity : ComponentActivity() {
                 card.addView(label(if (CenterMapOverlay.permitted(this)) "Draw over other apps: allowed"
                     else "Draw over other apps: not allowed. adb shell appops set $packageName SYSTEM_ALERT_WINDOW allow",
                     14, if (CenterMapOverlay.permitted(this)) MUTED else WARNING))
+                card.addView(label(if (HomeScreenMonitor.hasAccess(this)) "Usage Access: allowed, the card shows only on BYD home"
+                    else "Usage Access: not allowed, the card shows over every app. adb shell appops set $packageName GET_USAGE_STATS allow",
+                    14, if (HomeScreenMonitor.hasAccess(this)) MUTED else WARNING))
                 if (DiLink51ClusterLayout.supported()) {
                     val automatic = DiLink51ClusterLayout.automatic(this)
                     toggle(card, getString(R.string.follow_instrument_theme_and_map_card),

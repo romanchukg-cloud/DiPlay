@@ -23,7 +23,7 @@ import kotlin.math.abs
 
 /**
  * Lab: the dashboard map (CarPlay stream 111) as a floating card on the centre screen while DiPlay
- * is in the background, for example over BYD's home or map home. A second decoder draws the
+ * is in the background; with Usage Access only over BYD's home or map home (see [HomeScreenMonitor]). A second decoder draws the
  * stream here, so the dashboard keeps its map. Needs "display over other apps"
  * (SYSTEM_ALERT_WINDOW). A tap opens CarPlay; dragging moves the card.
  */
@@ -168,7 +168,7 @@ internal object CenterMapOverlay {
     }
 
     // A DiPlay activity in front makes the process foreground; the session service alone does not.
-    private fun diPlayInFront(): Boolean {
+    fun diPlayInFront(): Boolean {
         val state = ActivityManager.RunningAppProcessInfo()
         ActivityManager.getMyMemoryState(state)
         return state.importance <= ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND
