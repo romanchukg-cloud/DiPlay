@@ -4,6 +4,8 @@ import android.annotation.SuppressLint
 import android.content.Context
 import android.util.Base64
 import android.util.Log
+import com.shilapi.xcertplay.adb.AdbKeys
+import com.shilapi.xcertplay.adb.LocalAdb
 import com.shilapi.xcertplay.iap2.body.Iap2BodyReader
 import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import java.io.File
@@ -102,7 +104,8 @@ internal class ClusterCallState(private val clock: () -> Long) {
  * Optional, needs ADB over network: shows the CarPlay call (name and, once answered, its length) on the
  * dashboard, as BYD's own CarPlay does. Apps cannot write it, so DiPlay runs [BydClusterCallTool] from its
  * own APK under the head unit's adb shell, like [BydClusterSong]. While a call is answered the tool keeps
- * running and sends the length every second; it is stopped when the call ends.
+ * running on a shell connection of its own and sends the length every second; closing that connection
+ * (the call ended, or DiPlay is gone) makes it take the call off the dashboard.
  */
 internal object BydClusterCall {
     private const val TAG = "DiPlay-BYD-Call"
@@ -113,6 +116,7 @@ internal object BydClusterCall {
     @Volatile private var context: Context? = null
     private var wanted: ClusterCall? = null
     private var shown: ClusterCall? = null // writer thread
+    @Volatile private var timer: LocalAdb? = null // the connection the answered call's tool runs on
 
     fun attach(appContext: Context) {
         context = appContext.applicationContext
@@ -153,7 +157,8 @@ internal object BydClusterCall {
         // Only the newest call matters; older queued ones are skipped.
         val call = synchronized(state) { wanted }
         if (call == shown) return
-        // A separate command, so the pattern cannot match the shell that starts the next tool.
+        stopTimer()
+        // Leftovers from an earlier run; a separate command, so the pattern cannot match the next tool's shell.
         shell.run(app, "pkill -f '[B]ydClusterCallTool'")
         val apk = app.applicationInfo.sourceDir
         val tool = "CLASSPATH=$apk app_process /system/bin ${BydClusterCallTool::class.java.name}"
@@ -165,14 +170,28 @@ internal object BydClusterCall {
         val ok = if (call.activeSinceMillis == null) {
             succeeded(shell.run(app, "$tool show $name - -"))
         } else {
-            val since = call.activeSinceMillis
-            // Keeps running after the shell returns; it stops with the call or when DiPlay is gone.
-            shell.run(app, "nohup sh -c '$tool show $name $since ${android.os.Process.myPid()}' >/dev/null 2>&1 &") != null
+            startTimer(app, "$tool show $name ${call.activeSinceMillis} ${android.os.Process.myPid()}")
+            true
         }
         if (ok) {
             if (shown == null) Log.i(TAG, "call on the dashboard")
             shown = call
         }
+    }
+
+    /** Runs the answered call's tool on a connection of its own until [stopTimer] closes it. */
+    private fun startTimer(app: Context, command: String) {
+        val client = LocalAdb(AdbKeys.load(app))
+        timer = client
+        Thread({
+            val ran = client.stream(command) {}
+            if (!ran && timer === client) Log.w(TAG, "call length stopped: ADB link failed")
+        }, "diplay-call-length").apply { isDaemon = true; start() }
+    }
+
+    private fun stopTimer() {
+        timer?.close()
+        timer = null
     }
 
     private fun succeeded(output: String?): Boolean {
@@ -188,8 +207,9 @@ internal object BydClusterCall {
  * Runs under the head unit's adb shell through app_process, not in DiPlay: writes the call to the instrument
  * (BYDAutoInstrumentDevice sendCallInfo, sendCallState, sendCallTime), as BYD's CarPlay does.
  * Arguments: `show <base64 UTF-8 name> <answered at, epoch ms, or -> <DiPlay pid or ->` or `end`.
- * With an answer time it stays running and sends the call length every second until it is stopped or
- * the DiPlay process is gone; then it ends the call on the dashboard. Prints "name=result"; 0 is success.
+ * With an answer time it stays running and sends the call length every second until the shell connection
+ * closes (its output fails), it is stopped or the DiPlay process is gone; then it ends the call on the
+ * dashboard. Prints "name=result"; 0 is success.
  */
 object BydClusterCallTool {
     private const val STATE_CALL = 1
@@ -234,9 +254,12 @@ object BydClusterCallTool {
             val hours = (seconds / 3600).toInt()
             if (hours > MAX_HOURS) break
             sendTime.invoke(device, hours, (seconds / 60 % 60).toInt(), (seconds % 60).toInt())
+            // A closed shell connection shows up as an output error: DiPlay ended the call or is gone.
+            println("time=$seconds")
+            if (System.out.checkError()) break
             Thread.sleep(1000 - (System.currentTimeMillis() - since) % 1000)
         }
-        // DiPlay is gone (or the call is implausibly long): do not leave a call on the dashboard.
+        // The call ended, DiPlay is gone, or the call is implausibly long: do not leave it on the dashboard.
         sendState.invoke(device, STATE_NO_CALL)
     }
 

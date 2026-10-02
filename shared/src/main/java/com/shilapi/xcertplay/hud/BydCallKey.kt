@@ -45,9 +45,10 @@ internal object BydCallKey {
     private const val TAG = "DiPlay-BYD-CallKey"
     private const val RETRY_MILLIS = 15_000L
 
-    // Finds the wheel's input device by name, so its event number does not matter.
-    private const val COMMAND = "for d in /sys/class/input/event*; do " +
-        "if [ \"\$(cat \$d/device/name)\" = simulate-keys ]; then exec getevent -q /dev/input/\${d##*/}; fi; done"
+    // Finds the wheel's input device by name, so its event number does not matter. The shell may not read
+    // sysfs device names, so the name comes from getevent itself.
+    private const val COMMAND = "d=\$(getevent -pl 2>/dev/null | awk '/^add device/ {d=\$4} " +
+        "/name:/ && /\"simulate-keys\"/ {print d; exit}'); [ -n \"\$d\" ] && exec getevent -q \$d"
 
     @Volatile private var app: Context? = null
     @Volatile private var onPress: (() -> Unit)? = null
