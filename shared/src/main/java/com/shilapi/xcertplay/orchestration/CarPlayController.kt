@@ -292,6 +292,7 @@ class CarPlayController(
                 if (videoListener != null) {
                     val delivery = session.setVideoPlaybackAllowed(VideoInCar.allowed)
                     debugLog("video in car session allowed=${VideoInCar.allowed} delivery=$delivery")
+                    session.setLimitedUI(!VideoInCar.allowed)
                 }
             }
             activeSession = session
@@ -420,6 +421,9 @@ class CarPlayController(
                     val delivery = activeSession?.setVideoPlaybackAllowed(allowed)
                         ?: VideoPlaybackDelivery.QUEUED
                     debugLog("video in car allowed=$allowed delivery=$delivery")
+                    // EXPERIMENT: in P the iPhone may show its full UI.
+                    val limitedSent = activeSession?.setLimitedUI(!allowed)
+                    debugLog("limited UI=${!allowed} sent=${limitedSent ?: "no session"}")
                     listener.onVideoAllowedChanged(allowed)
                 },
                 onObserved = { parked ->

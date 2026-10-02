@@ -74,6 +74,10 @@ object AirPlayInfoPlist {
         }
         if (config.hevc) info["hevcInfo"] = emptyMap<String, Any?>()
         // EXPERIMENT: the key CarPlay Simulator and BYD's own CarPlay pair with the enhancedSiri feature.
+        // EXPERIMENT: what may be limited while driving, as CarPlay Simulator lists it (not japanMaps).
+        if (config.limitedUiByGear) {
+            info["limitedUIElements"] = listOf("softKeyboard", "softPhoneKeypad", "nonMusicLists", "musicLists")
+        }
         if (config.enhancedSiriProbe) info["enhancedSiriInfo"] = linkedMapOf<String, Any?>("enhancedSiriButton" to true)
         if (config.videoInCar) {
             // The iPhone tears down a session that enables videoPlayback without this key.
