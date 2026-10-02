@@ -31,6 +31,13 @@ class BydClusterCallTest {
     }
 
     @Test
+    fun incomingCallBeingAnsweredStillRings() {
+        state.accept(update { string(1, "Anna"); u8(2, 2); u8(3, 1); string(4, "A") })
+        assertEquals(ClusterCall.Phase.RINGING, state.accept(update { u8(2, 3); u8(3, 1); string(4, "A") })?.phase)
+        assertEquals(ClusterCall.Phase.ACTIVE, state.accept(update { u8(2, 4); u8(3, 1); string(4, "A") })?.phase)
+    }
+
+    @Test
     fun outgoingCallShowsTheNumberWithoutAName() {
         assertEquals(ClusterCall("+380 00 000 0000", ClusterCall.Phase.DIALING, null),
             state.accept(update { string(0, "+380 00 000 0000"); u8(2, 1); u8(3, 2); string(4, "B") }))
