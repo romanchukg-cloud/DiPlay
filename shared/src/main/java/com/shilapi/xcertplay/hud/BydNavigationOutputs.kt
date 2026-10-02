@@ -65,11 +65,16 @@ object BydNavigationOutputs {
         }
         BydClusterMapPause.initialize(app)
         BydClusterSong.attach(app)
+        BydClusterCall.attach(app)
     }
 
     internal fun onFrame(frame: Iap2Frame) {
         if (frame.messageId == ClusterSongState.NOW_PLAYING_UPDATE) {
             BydClusterSong.onFrame(frame)
+            return
+        }
+        if (frame.messageId == ClusterCallState.CALL_STATE_UPDATE) {
+            BydClusterCall.onFrame(frame)
             return
         }
         if (frame.messageId != BydHudRouteState.ROUTE_GUIDANCE_UPDATE &&
@@ -126,9 +131,12 @@ object BydNavigationOutputs {
     /** A short note where the song shows on the dashboard; needs the same ADB access as the song. */
     fun dashboardNote(text: String, source: Int? = null) = BydClusterSong.note(text, source)
 
+    /** The dashboard call setting changed; applies at once. */
+    fun clusterCallChanged(enabled: Boolean) = BydClusterCall.settingChanged(enabled)
+
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
     fun endNow() {
-        standalone.clear(); hud.clear(); cluster.clear(); BydClusterSong.end()
+        standalone.clear(); hud.clear(); cluster.clear(); BydClusterSong.end(); BydClusterCall.end()
         synchronized(overlayLock) { overlayRoute.clear() }
         refreshTurnOverlay()
     }

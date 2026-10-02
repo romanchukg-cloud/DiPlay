@@ -21,6 +21,7 @@ object BydOutputSettings {
     private const val KEY_HUD_SONG = "hud_song"
     private const val KEY_OEM_CLUSTER_HOLD = "oem_cluster_hold"
     private const val KEY_LEGACY_VEHICLE_PROBE = "legacy_vehicle_probe"
+    private const val KEY_CLUSTER_CALL = "cluster_call"
     const val DEFAULT_LOW_CHARGE_PERCENT = 20
     val lowChargePresets = listOf(10, 15, 20, 25, 30)
 
@@ -104,6 +105,10 @@ object BydOutputSettings {
             "Could not persist BYD vehicle-data mode"
         }
     }
+    fun clusterCall(context: Context): Boolean = prefs(context).getBoolean(KEY_CLUSTER_CALL, false)
+
+    fun setClusterCall(context: Context, enabled: Boolean) =
+        prefs(context).edit().putBoolean(KEY_CLUSTER_CALL, enabled).apply()
 
     /** Optional title/lyrics when navigation is absent; only the verified HUD output can send it. */
     fun hudSong(context: Context): Boolean = prefs(context).getBoolean(KEY_HUD_SONG, false)
