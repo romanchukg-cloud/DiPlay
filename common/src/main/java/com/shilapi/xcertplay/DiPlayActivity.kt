@@ -568,6 +568,16 @@ class DiPlayActivity : ComponentActivity() {
             }
             mediaChannelControl(card)
             navigationChannelControl(card)
+            // EXPERIMENT (lab): does DiPlay hear the car's microphone while CarPlay runs?
+            card.addView(button(getString(R.string.lab_mic_probe), false) {
+                val started = MicProbe.start(this) { summary ->
+                    runOnUiThread {
+                        AlertDialog.Builder(this).setTitle(getString(R.string.lab_mic_probe))
+                            .setMessage(summary).setPositiveButton(android.R.string.ok, null).show()
+                    }
+                }
+                toast(getString(if (started) R.string.lab_mic_probe_running else R.string.lab_mic_probe_busy))
+            }, matchButton(10, 56))
         }
         section(content, getString(R.string.location), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.report_location_to_iphone),

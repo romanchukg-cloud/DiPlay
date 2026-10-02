@@ -640,4 +640,7 @@
     <string name="first_tcp_timeout">The iPhone did not connect to CarPlay in time</string>
     <string name="wireless_startup_retries_exhausted">Automatic retries stopped. Check the connection and retry manually.</string>
     <string name="retry_carplay_connection">Retry connection</string>
+    <string name="lab_mic_probe">Lab: microphone check (30 s)</string>
+    <string name="lab_mic_probe_running">Listening to the car microphone for 30 s, numbers only…</string>
+    <string name="lab_mic_probe_busy">The microphone check is already running</string>
 </resources>
