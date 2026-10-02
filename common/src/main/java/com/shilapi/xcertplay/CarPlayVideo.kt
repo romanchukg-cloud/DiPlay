@@ -48,6 +48,12 @@ internal object CarPlayVideo : CarPlayVideoListener {
     var pendingSeekMillis: Int? = null
     var activity: CarPlayVideoActivity? = null
 
+    /**
+     * EXPERIMENT: the car resumed what the iPhone paused, for example after the phone was locked: Safari
+     * pauses then and lets the item go about 10 s later, so the car keeps playing it without the iPhone.
+     */
+    private var carResumed = false
+
     fun attach(context: Context, next: CarPlayController) {
         appContext = context.applicationContext
         controller = next
@@ -62,7 +68,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
 
     override fun onVideoSessionEnded() {
         main.post {
-            stop()
+            if (!keepWithoutIphone()) stop()
             streamId = null
         }
     }
@@ -93,6 +99,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
     /** Play or pause from the car (wheel or on-screen button); tells the iPhone at once. Main thread. */
     fun setPlaying(next: Boolean) {
         playing = next
+        carResumed = next
         activity?.applyRate()
         streamId?.let { reply(it, VideoInCar.playbackStateNotification(next, itemUuid)) }
     }
@@ -110,6 +117,11 @@ internal object CarPlayVideo : CarPlayVideoListener {
 
     /** The player closed on the car (Back, or the car left P): pause, so the iPhone shows it paused. */
     fun onPlayerClosed(positionMillis: Int?) {
+        if (streamId == null) {
+            // It was playing without the iPhone: nothing is left to resume.
+            stop()
+            return
+        }
         positionMillis?.let { startMillis = it }
         if (playing) setPlaying(false)
     }
@@ -136,6 +148,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
             }
             "setRate" -> {
                 playing = ((message["rate"] as? Number)?.toDouble() ?: 0.0) > 0.0
+                carResumed = false
                 // The iPhone starts the item at once, as Apple's receiver plays it straight
                 // away, so open the player now instead of waiting for Now Playing's video button.
                 if (playing && activity == null) show()
@@ -155,7 +168,7 @@ internal object CarPlayVideo : CarPlayVideoListener {
                 reply(streamId, VideoInCar.propertyResponse(message["messageID"], message["property"], playerState()))
             }
             "unhandledURL" -> onUrlLoaded(message)
-            "stop", "removePlayQueueItem" -> stop()
+            "stop", "removePlayQueueItem" -> if (!keepWithoutIphone()) stop()
             "setProperty" -> Unit
             else -> Log.i(TAG, "video message $type keys=${message.keys}")
         }
@@ -245,7 +258,17 @@ internal object CarPlayVideo : CarPlayVideoListener {
         player.finish()
     }
 
+    /** EXPERIMENT: when the car resumed the item ([carResumed]), it keeps it after the iPhone lets it go. */
+    private fun keepWithoutIphone(): Boolean {
+        if (!carResumed || activity == null) return false
+        if (streamId != null) Log.i(TAG, "the iPhone let the item go; the car keeps playing it")
+        streamId = null
+        itemUuid = null
+        return true
+    }
+
     private fun stop() {
+        carResumed = false
         url = null
         itemUuid = null
         playing = false
