@@ -22,6 +22,7 @@ object BydOutputSettings {
     private const val KEY_OEM_CLUSTER_HOLD = "oem_cluster_hold"
     private const val KEY_LEGACY_VEHICLE_PROBE = "legacy_vehicle_probe"
     private const val KEY_CLUSTER_CALL = "cluster_call"
+    private const val KEY_CALL_KEY = "call_key"
     const val DEFAULT_LOW_CHARGE_PERCENT = 20
     val lowChargePresets = listOf(10, 15, 20, 25, 30)
 
@@ -124,6 +125,11 @@ object BydOutputSettings {
     }
     fun setOemClusterHold(context: Context, hold: BydOemClusterHold) =
         prefs(context).edit().putString(KEY_OEM_CLUSTER_HOLD, hold.name).apply()
+
+    fun callKey(context: Context): Boolean = prefs(context).getBoolean(KEY_CALL_KEY, false)
+
+    fun setCallKey(context: Context, enabled: Boolean) =
+        prefs(context).edit().putBoolean(KEY_CALL_KEY, enabled).apply()
 
     /** At or below this charge the iPhone gets the low-range warning. */
     fun lowChargePercent(context: Context): Int = prefs(context).getInt(KEY_LOW_CHARGE_PERCENT, DEFAULT_LOW_CHARGE_PERCENT)

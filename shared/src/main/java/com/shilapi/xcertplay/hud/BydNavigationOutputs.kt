@@ -134,6 +134,9 @@ object BydNavigationOutputs {
     /** The dashboard call setting changed; applies at once. */
     fun clusterCallChanged(enabled: Boolean) = BydClusterCall.settingChanged(enabled)
 
+    /** The wheel phone button setting changed; applies at once while a session runs. */
+    fun callKeyChanged(enabled: Boolean) = BydCallKey.settingChanged(enabled)
+
     /** Best effort while alive; Android does not guarantee callbacks before force-stop. */
     fun endNow() {
         standalone.clear(); hud.clear(); cluster.clear(); BydClusterSong.end(); BydClusterCall.end()

@@ -528,6 +528,8 @@
     <string name="cluster_song_description">CarPlay 正在播放的歌曲名和歌手会显示在仪表盘的音乐卡片中，并同步播放和暂停状态。卡片以比亚迪的“其他”音源显示，因为仪表盘不会绘制 CarPlay 自身的音源。立即生效。需要车机开启网络 ADB。</string>
     <string name="cluster_call">仪表盘显示来电 · 需要 ADB</string>
     <string name="cluster_call_description">CarPlay 通话时，对方的名字会显示在仪表盘上，接通后还会显示通话时长。立即生效。需要车机开启网络 ADB。</string>
+    <string name="call_key">方向盘电话键用于 CarPlay 通话 · 需要 ADB</string>
+    <string name="call_key_description">CarPlay 通话时，方向盘上的电话键可以接听或挂断电话。比亚迪的电话界面仍会短暂打开，DiPlay 会切回 CarPlay。没有 CarPlay 通话时，按键照常使用。立即生效。需要车机开启网络 ADB。</string>
     <string name="video_back_to_carplay">返回 CarPlay</string>
     <string name="video_play">播放</string>
     <string name="video_pause">暂停</string>

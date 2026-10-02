@@ -128,6 +128,9 @@ internal object BydClusterCall {
         if (BydOutputSettings.clusterCall(app)) post(app, call)
     }
 
+    /** Whether the iPhone reports a CarPlay call that is ringing, being dialled or answered. */
+    fun hasCall(): Boolean = synchronized(state) { state.current() != null }
+
     /** The setting changed: show the current call now, or take DiPlay's call off the dashboard. */
     fun settingChanged(enabled: Boolean) {
         val app = context ?: return

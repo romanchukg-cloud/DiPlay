@@ -100,6 +100,41 @@ class LocalAdb(
         }
     }
 
+    /**
+     * Runs [command] and hands its output to [onOutput] as it arrives, until the command ends or the link is
+     * closed from another thread with [close]. Blocking; use a connection of its own for it.
+     * Returns false if the link failed or was closed.
+     */
+    fun stream(command: String, onOutput: (String) -> Unit): Boolean {
+        if (socket?.isClosed != false && connect(mayAsk = false) != Access.READY) return false
+        return try {
+            // The command may stay silent for a long time; only close() ends the wait.
+            socket?.soTimeout = 0
+            val local = nextStreamId++
+            send(AdbPacket(AdbPacket.OPEN, local, 0, "shell:$command\u0000".toByteArray()))
+            var remote = 0
+            var finished = false
+            while (!finished) {
+                val packet = receive()
+                when {
+                    packet.command == AdbPacket.OKAY && packet.arg1 == local -> remote = packet.arg0
+                    packet.command == AdbPacket.WRTE && packet.arg1 == local -> {
+                        send(AdbPacket(AdbPacket.OKAY, local, packet.arg0, ByteArray(0)))
+                        onOutput(String(packet.payload, Charsets.UTF_8))
+                    }
+                    packet.command == AdbPacket.CLSE && packet.arg1 == local -> {
+                        if (remote != 0) send(AdbPacket(AdbPacket.CLSE, local, remote, ByteArray(0)))
+                        finished = true
+                    }
+                }
+            }
+            true
+        } catch (_: IOException) {
+            closeQuietly()
+            false
+        }
+    }
+
     @Synchronized
     override fun close() = closeQuietly()
 

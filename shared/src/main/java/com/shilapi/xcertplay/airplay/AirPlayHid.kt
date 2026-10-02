@@ -70,6 +70,9 @@ object AirPlayHid {
 
     fun telephonyReport(index: Int): ByteArray = byteArrayOf(index.toByte())
 
+    /** [telephonyReport] index of Hook Switch (usage 0x20): answers a ringing call or ends the current one. */
+    const val TELEPHONY_HOOK_SWITCH = 1
+
     private fun hidDeviceEntry(
         uid: Int,
         name: String,
