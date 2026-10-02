@@ -129,6 +129,15 @@ class AndroidCarPlayLocationProvider(
         }
     }
 
+    /** The latest fix's course and speed, for the car's heading. */
+    fun latestCourse(): CourseSample? = latestFix()?.let { fix ->
+        CourseSample(
+            timeMillis = fix.time,
+            courseDegrees = fix.bearing.takeIf { fix.hasBearing() }?.toDouble(),
+            speedMetersPerSecond = fix.speed.takeIf { fix.hasSpeed() }?.toDouble(),
+        )
+    }
+
     private fun latestFix(): Location? {
         val now = System.currentTimeMillis()
         return preferredProviders.asSequence()

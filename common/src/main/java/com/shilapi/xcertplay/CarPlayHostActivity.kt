@@ -157,6 +157,8 @@ class CarPlayHostActivity : ComponentActivity() {
             vehicleStatusEnabled = com.shilapi.xcertplay.hud.BydOutputSettings.batteryToIphoneActive(this),
             chargingConnectors = com.shilapi.xcertplay.hud.BydOutputSettings.chargingConnectors(this),
             vehicleSpeedEnabled = locationReportingEnabled && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this),
+            // Lab: the car's heading, remembered between trips, for the iPhone's map at start.
+            vehicleHeadingEnabled = locationReportingEnabled,
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),
@@ -3982,14 +3984,25 @@ class CarPlayHostActivity : ComponentActivity() {
             size
         }
         val airPlayConfig = createAirPlayConfig(effectiveSize)
-        val locationProvider: Iap2LocationProvider? =
+        val androidLocation = AndroidCarPlayLocationProvider(this)
+        val positionProvider: Iap2LocationProvider? =
             when {
                 !config.locationReportingEnabled -> null
                 config.identification.vehicleSpeedEnabled -> VehicleSpeedLocationProvider(
-                    AndroidCarPlayLocationProvider(this),
+                    androidLocation,
                     com.shilapi.xcertplay.hud.BydNavigationOutputs.wheelSpeed(applicationContext),
                 )
-                else -> AndroidCarPlayLocationProvider(this)
+                else -> androidLocation
+            }
+        val locationProvider: Iap2LocationProvider? =
+            if (positionProvider != null && config.identification.vehicleHeadingEnabled) {
+                com.shilapi.xcertplay.location.VehicleHeadingLocationProvider(
+                    positionProvider,
+                    com.shilapi.xcertplay.location.CarHeadingSource(applicationContext),
+                    androidLocation::latestCourse,
+                )
+            } else {
+                positionProvider
             }
         appendLog(
             "Starting CarPlay controller at ${size.width}x${size.height} -> " +

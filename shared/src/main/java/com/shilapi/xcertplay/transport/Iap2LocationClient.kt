@@ -219,6 +219,9 @@ object Iap2LocationMessages {
     /** 0xFFFA selector for `$PASCD`; the matching IdentificationInformation flag is 20. */
     const val VEHICLE_SPEED_DATA = 4
 
+    /** 0xFFFA selector for `$GPHDT`; the matching IdentificationInformation flag is 23. */
+    const val VEHICLE_HEADING_DATA = 7
+
     /** The parameter ids of a 0xFFFA request (the sentence types asked for), or none if unreadable. */
     fun requestedComponents(frame: Iap2Frame): Set<Int> =
         runCatching { frame.body().asList().map { it.id }.toSortedSet() }.getOrDefault(emptySet())

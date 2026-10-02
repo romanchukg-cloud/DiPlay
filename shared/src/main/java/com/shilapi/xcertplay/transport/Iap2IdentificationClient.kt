@@ -57,6 +57,8 @@ data class Iap2IdentificationConfig(
     val chargingConnectors: EvChargingConnectors = EvChargingConnectors.CCS2_TYPE2,
     /** Also offer wheel speed ($PASCD) in the location component; needs [locationInformationEnabled]. */
     val vehicleSpeedEnabled: Boolean = false,
+    /** Also offer the car's heading ($GPHDT) in the location component; needs [locationInformationEnabled]. */
+    val vehicleHeadingEnabled: Boolean = false,
 ) {
     constructor(
         name: String,
@@ -278,6 +280,7 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                         void(17)
                         void(18)
                         if (config.vehicleSpeedEnabled) void(20)
+                        if (config.vehicleHeadingEnabled) void(23)
                     }
                 }
                 group(30) {
