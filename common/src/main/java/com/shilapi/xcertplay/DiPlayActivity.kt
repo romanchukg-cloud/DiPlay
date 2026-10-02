@@ -1459,6 +1459,14 @@ class DiPlayActivity : ComponentActivity() {
             BydOutputSettings.setClusterSongOnChange(this, it)
             BydNavigationOutputs.clusterSongOnChangeChanged()
         }
+        // Lab: the CarPlay call on the dashboard.
+        toggle(card, getString(R.string.cluster_call),
+            getString(R.string.cluster_call_description),
+            BydOutputSettings.clusterCall(this), enabled = !adbSwitchChangePending) {
+            BydOutputSettings.setClusterCall(this, it)
+            if (it) checkAdbState(mayAsk = true)
+            BydNavigationOutputs.clusterCallChanged(it)
+        }
     }
 
     private fun advancedVehicleData(card: LinearLayout) {
