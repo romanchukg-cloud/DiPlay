@@ -556,16 +556,23 @@ class CarPlayController(
     /** Called after the wheel's phone button answered or ended a CarPlay call (BYD's phone screen opened too). */
     @Volatile var callKeyListener: (() -> Unit)? = null
 
-    /** The wheel's phone button (BYD, read over adb): answers or ends the CarPlay call, if there is one. */
+    /** The wheel's phone button (BYD, read over adb): answers a ringing CarPlay call or hangs up the current one. */
     private fun onCallKey() {
-        if (!com.shilapi.xcertplay.hud.BydClusterCall.hasCall()) return
+        val phase = com.shilapi.xcertplay.hud.BydClusterCall.phase() ?: return
         val session = activeSession ?: return
+        val answer = phase == com.shilapi.xcertplay.hud.ClusterCall.Phase.RINGING
+        // Hook Switch would put an answered call on hold, so hanging up uses Drop.
+        val button = if (answer) {
+            com.shilapi.xcertplay.airplay.AirPlayHid.TELEPHONY_HOOK_SWITCH
+        } else {
+            com.shilapi.xcertplay.airplay.AirPlayHid.TELEPHONY_DROP
+        }
         try {
-            touchExecutor.execute { session.sendTelephony(com.shilapi.xcertplay.airplay.AirPlayHid.TELEPHONY_HOOK_SWITCH) }
+            touchExecutor.execute { session.sendTelephony(button) }
         } catch (_: Exception) {
             return
         }
-        debugLog("wheel phone button -> CarPlay hook switch")
+        debugLog("wheel phone button -> CarPlay ${if (answer) "answer (hook switch)" else "hang up (drop)"}")
         callKeyListener?.invoke()
     }
 

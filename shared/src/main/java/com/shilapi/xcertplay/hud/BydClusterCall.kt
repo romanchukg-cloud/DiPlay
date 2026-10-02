@@ -24,7 +24,12 @@ internal data class ClusterCall(val name: String, val phase: Phase, val activeSi
  * means there is none. An answered call wins over a ringing one, and that over one being dialled.
  */
 internal class ClusterCallState(private val clock: () -> Long) {
-    private class Call(var name: String = "", var status: Int = STATUS_DISCONNECTED, var activeSince: Long? = null)
+    private class Call(
+        var name: String = "",
+        var status: Int = STATUS_DISCONNECTED,
+        var incoming: Boolean = false,
+        var activeSince: Long? = null,
+    )
 
     private val calls = LinkedHashMap<String, Call>()
 
@@ -49,6 +54,7 @@ internal class ClusterCallState(private val clock: () -> Long) {
             displayName.isNotEmpty() -> call.name = displayName
             remoteId.isNotEmpty() && call.name.isEmpty() -> call.name = remoteId
         }
+        runCatching { body.optionalU8(DIRECTION) }.getOrNull()?.let { call.incoming = it == DIRECTION_INCOMING }
         if (status != null) {
             call.status = status
             if ((status == STATUS_ACTIVE || status == STATUS_HELD) && call.activeSince == null) call.activeSince = clock()
@@ -58,12 +64,13 @@ internal class ClusterCallState(private val clock: () -> Long) {
 
     fun current(): ClusterCall? {
         val shown = calls.values.firstOrNull { it.activeSince != null }
-            ?: calls.values.firstOrNull { it.status == STATUS_RINGING }
+            ?: calls.values.firstOrNull { it.status == STATUS_RINGING || it.incoming && it.status == STATUS_CONNECTING }
             ?: calls.values.firstOrNull { it.status == STATUS_SENDING || it.status == STATUS_CONNECTING }
             ?: return null
         val phase = when {
             shown.activeSince != null -> ClusterCall.Phase.ACTIVE
-            shown.status == STATUS_RINGING -> ClusterCall.Phase.RINGING
+            // An incoming call being answered is still ringing until it is active.
+            shown.status == STATUS_RINGING || shown.incoming -> ClusterCall.Phase.RINGING
             else -> ClusterCall.Phase.DIALING
         }
         return ClusterCall(text(shown.name), phase, shown.activeSince)
@@ -77,6 +84,8 @@ internal class ClusterCallState(private val clock: () -> Long) {
         private const val REMOTE_ID = 0
         private const val DISPLAY_NAME = 1
         private const val STATUS = 2
+        private const val DIRECTION = 3
+        private const val DIRECTION_INCOMING = 1
         private const val UUID = 4
         private const val STATUS_DISCONNECTED = 0
         private const val STATUS_SENDING = 1
@@ -132,8 +141,8 @@ internal object BydClusterCall {
         if (BydOutputSettings.clusterCall(app)) post(app, call)
     }
 
-    /** Whether the iPhone reports a CarPlay call that is ringing, being dialled or answered. */
-    fun hasCall(): Boolean = synchronized(state) { state.current() != null }
+    /** The CarPlay call the wheel's phone button acts on, or null when there is none. */
+    fun phase(): ClusterCall.Phase? = synchronized(state) { state.current()?.phase }
 
     /** The setting changed: show the current call now, or take DiPlay's call off the dashboard. */
     fun settingChanged(enabled: Boolean) {
