@@ -286,6 +286,7 @@ class CarPlayController(
             val replacement = activeSession !== session
             if (replacement) {
                 BydNavigationOutputs.start(appContext)
+                com.shilapi.xcertplay.hud.BydCallKey.start(appContext, ::onCallKey)
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(true)
                 // The gear may have changed since /info.
                 if (videoListener != null) {
@@ -306,6 +307,7 @@ class CarPlayController(
             if (activeSession === session) {
                 activeSession = null
                 BydNavigationOutputs.endNow()
+                com.shilapi.xcertplay.hud.BydCallKey.stop()
                 com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
                 videoListener?.onVideoSessionEnded()
                 synchronized(playbackStatus) {
@@ -551,6 +553,22 @@ class CarPlayController(
         }
     }
 
+    /** Called after the wheel's phone button answered or ended a CarPlay call (BYD's phone screen opened too). */
+    @Volatile var callKeyListener: (() -> Unit)? = null
+
+    /** The wheel's phone button (BYD, read over adb): answers or ends the CarPlay call, if there is one. */
+    private fun onCallKey() {
+        if (!com.shilapi.xcertplay.hud.BydClusterCall.hasCall()) return
+        val session = activeSession ?: return
+        try {
+            touchExecutor.execute { session.sendTelephony(com.shilapi.xcertplay.airplay.AirPlayHid.TELEPHONY_HOOK_SWITCH) }
+        } catch (_: Exception) {
+            return
+        }
+        debugLog("wheel phone button -> CarPlay hook switch")
+        callKeyListener?.invoke()
+    }
+
     fun sendMediaButton(index: Int): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
@@ -575,6 +593,7 @@ class CarPlayController(
         connectionDiagnostic("teardown begin transport=${config.transport}")
         videoGate?.close()
         BydNavigationOutputs.endNow()
+        com.shilapi.xcertplay.hud.BydCallKey.stop()
         com.shilapi.xcertplay.glance.CarPlayGlance.setConnected(false)
         BydNavigationOutputs.clearClusterStreamControl(::applyClusterUi)
         closeReceivers()

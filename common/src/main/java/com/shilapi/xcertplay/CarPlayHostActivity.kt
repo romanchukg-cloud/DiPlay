@@ -4065,6 +4065,15 @@ class CarPlayHostActivity : ComponentActivity() {
         updateClusterMapShown()
         CarPlayMediaKeys.attach(this, next)
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
+        // BYD's phone screen opens on the same wheel press: bring CarPlay back once it is up.
+        next.callKeyListener = {
+            for (delay in CALL_KEY_RETURN_MILLIS) {
+                mainHandler.postDelayed({
+                    startActivity(Intent(applicationContext, CarPlayHostActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                }, delay)
+            }
+        }
         val display = CarPlaySessionDisplay(
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
             displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,
@@ -4845,6 +4854,8 @@ class CarPlayHostActivity : ComponentActivity() {
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
         private const val CENTER_MAP_IDLE_MILLIS = 3_000L // a reconnect is quicker; a session end is not
+        // BYD's phone screen starts within ~20 ms of the press; a second try covers a slow start.
+        val CALL_KEY_RETURN_MILLIS = longArrayOf(400L, 1_200L)
         const val LOG_RETENTION_MILLIS = 5 * 60_000L
         const val DISPLAY_CHANGE_DEBOUNCE_MILLIS = 500L
         const val CONFIGURATION_POLL_INTERVAL_MILLIS = 2_000L

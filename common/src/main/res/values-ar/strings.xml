@@ -493,6 +493,8 @@
     <string name="cluster_song_description">يظهر اسم أغنية CarPlay والفنان في بطاقة الموسيقى على لوحة العدادات، مع التشغيل والإيقاف المؤقت. تظهر البطاقة كمصدر الموسيقى «آخر» من BYD، لأن لوحة العدادات لا تعرض مصدر CarPlay الخاص. يُطبَّق فورًا. يتطلب ADB عبر الشبكة على وحدة القيادة.</string>
     <string name="cluster_call">المكالمة على لوحة العدادات · يتطلب ADB</string>
     <string name="cluster_call_description">أثناء مكالمة CarPlay يظهر اسم المتصل على لوحة العدادات، وبعد الرد تظهر مدة المكالمة. يُطبَّق فورًا. يتطلب ADB عبر الشبكة على وحدة القيادة.</string>
+    <string name="call_key">زر الهاتف في المقود لمكالمات CarPlay · يتطلب ADB</string>
+    <string name="call_key_description">أثناء مكالمة CarPlay يرد زر الهاتف في المقود على المكالمة أو ينهيها. تظل شاشة الهاتف من BYD تظهر لحظة، ثم يعيد DiPlay عرض CarPlay. بدون مكالمة CarPlay يعمل الزر كالمعتاد. يُطبَّق فورًا. يتطلب ADB عبر الشبكة على وحدة القيادة.</string>
     <string name="video_back_to_carplay">العودة إلى CarPlay</string>
     <string name="video_play">تشغيل</string>
     <string name="video_pause">إيقاف مؤقت</string>

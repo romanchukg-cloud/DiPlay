@@ -493,6 +493,8 @@
     <string name="cluster_song_description">Название и исполнитель песни из CarPlay показываются в музыкальной карточке на приборной панели, вместе с воспроизведением и паузой. Карточка отображается как источник BYD «другое», потому что панель не рисует собственный источник CarPlay. Применяется сразу. Нужен ADB по сети на головном устройстве.</string>
     <string name="cluster_call">Звонок на приборной панели · нужен ADB</string>
     <string name="cluster_call_description">Во время звонка CarPlay на приборной панели показывается имя собеседника, а после ответа — длительность разговора. Применяется сразу. Нужен ADB по сети на головном устройстве.</string>
+    <string name="call_key">Кнопка телефона на руле для звонков CarPlay · нужен ADB</string>
+    <string name="call_key_description">Во время звонка CarPlay кнопка телефона на руле принимает или завершает звонок. Экран звонков BYD всё равно на мгновение открывается, и DiPlay возвращает CarPlay. Без звонка CarPlay кнопка работает как раньше. Применяется сразу. Нужен ADB по сети на головном устройстве.</string>
     <string name="video_back_to_carplay">Назад в CarPlay</string>
     <string name="video_play">Воспроизвести</string>
     <string name="video_pause">Пауза</string>

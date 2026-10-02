@@ -529,6 +529,8 @@
     <string name="cluster_song_description">The CarPlay song title and artist appear in the music card on the instrument cluster, with play and pause. The card shows as BYD’s “Other” music source, because the dashboard does not draw CarPlay’s own source. Applies at once. Needs ADB over network on the head unit.</string>
     <string name="cluster_call">Call on the dashboard · needs ADB</string>
     <string name="cluster_call_description">During a CarPlay call the caller’s name appears on the instrument cluster, and once the call is answered, how long it has lasted. Applies at once. Needs ADB over network on the head unit.</string>
+    <string name="call_key">Wheel phone button for CarPlay calls · needs ADB</string>
+    <string name="call_key_description">During a CarPlay call the phone button on the steering wheel answers or ends the call. BYD’s phone screen still opens for a moment, and DiPlay brings CarPlay back. Without a CarPlay call the button works as before. Applies at once. Needs ADB over network on the head unit.</string>
     <string name="video_back_to_carplay">Back to CarPlay</string>
     <string name="video_play">Play</string>
     <string name="video_pause">Pause</string>

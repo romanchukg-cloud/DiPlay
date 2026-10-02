@@ -493,6 +493,8 @@
     <string name="cluster_song_description">El título y el artista de la canción de CarPlay aparecen en la tarjeta de música del cuadro de instrumentos, con reproducción y pausa. La tarjeta se muestra como la fuente de música «otra» de BYD, porque el cuadro no dibuja la fuente propia de CarPlay. Se aplica al instante. Requiere ADB por red en la unidad principal.</string>
     <string name="cluster_call">Llamada en el cuadro · requiere ADB</string>
     <string name="cluster_call_description">Durante una llamada de CarPlay, el nombre del interlocutor aparece en el cuadro de instrumentos y, una vez contestada, su duración. Se aplica al instante. Requiere ADB por red en la unidad principal.</string>
+    <string name="call_key">Botón de teléfono del volante para llamadas de CarPlay · requiere ADB</string>
+    <string name="call_key_description">Durante una llamada de CarPlay, el botón de teléfono del volante contesta o finaliza la llamada. La pantalla de teléfono de BYD sigue abriéndose un momento y DiPlay vuelve a mostrar CarPlay. Sin una llamada de CarPlay, el botón funciona como antes. Se aplica al instante. Requiere ADB por red en la unidad principal.</string>
     <string name="video_back_to_carplay">Volver a CarPlay</string>
     <string name="video_play">Reproducir</string>
     <string name="video_pause">Pausa</string>

@@ -1660,6 +1660,14 @@ class DiPlayActivity : ComponentActivity() {
             if (it) checkAdbState(mayAsk = true)
             BydNavigationOutputs.clusterCallChanged(it)
         }
+        // Lab: the wheel's phone button for CarPlay calls.
+        toggle(card, getString(R.string.call_key),
+            getString(R.string.call_key_description),
+            BydOutputSettings.callKey(this), enabled = !adbSwitchChangePending) {
+            BydOutputSettings.setCallKey(this, it)
+            if (it) checkAdbState(mayAsk = true)
+            BydNavigationOutputs.callKeyChanged(it)
+        }
     }
 
     private fun advancedVehicleData(card: LinearLayout) {
