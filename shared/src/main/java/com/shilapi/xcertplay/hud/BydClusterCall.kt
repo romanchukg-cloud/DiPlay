@@ -167,10 +167,11 @@ internal object BydClusterCall {
             return
         }
         val name = Base64.encodeToString(call.name.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        val phase = call.phase.name.lowercase()
         val ok = if (call.activeSinceMillis == null) {
-            succeeded(shell.run(app, "$tool show $name - -"))
+            succeeded(shell.run(app, "$tool show $phase $name - -"))
         } else {
-            startTimer(app, "$tool show $name ${call.activeSinceMillis} ${android.os.Process.myPid()}")
+            startTimer(app, "$tool show $phase $name ${call.activeSinceMillis} ${android.os.Process.myPid()}")
             true
         }
         if (ok) {
@@ -204,9 +205,11 @@ internal object BydClusterCall {
 }
 
 /**
- * Runs under the head unit's adb shell through app_process, not in DiPlay: writes the call to the instrument
- * (BYDAutoInstrumentDevice sendCallInfo, sendCallState, sendCallTime), as BYD's CarPlay does.
- * Arguments: `show <base64 UTF-8 name> <answered at, epoch ms, or -> <DiPlay pid or ->` or `end`.
+ * Runs under the head unit's adb shell through app_process, not in DiPlay: tells the car about the call the way
+ * BYD's own CarPlay does: the call state (BYDAutoSettingDevice setCallState, setBTCallState), then the
+ * dashboard (BYDAutoInstrumentDevice sendCallInfo, sendCallState, sendCallTime).
+ * Arguments: `show <ringing|dialing|active> <base64 UTF-8 name> <answered at, epoch ms, or -> <DiPlay pid or ->`
+ * or `end`.
  * With an answer time it stays running and sends the call length every second until the shell connection
  * closes (its output fails), it is stopped or the DiPlay process is gone; then it ends the call on the
  * dashboard. Prints "name=result"; 0 is success.
@@ -214,6 +217,9 @@ internal object BydClusterCall {
 object BydClusterCallTool {
     private const val STATE_CALL = 1
     private const val STATE_NO_CALL = 2
+    private const val IN_CALL = 1
+    private const val NOT_IN_CALL = 0
+    private const val BT_ENDED = 5
     private const val TIME_UNKNOWN = 255
     private const val MAX_HOURS = 99
 
@@ -230,25 +236,40 @@ object BydClusterCallTool {
     }
 
     private fun run(args: Array<String>) {
-        val device = device()
-        val type = device.javaClass
-        val sendState = type.getMethod("sendCallState", Int::class.java)
-        if (args.getOrNull(0) != "show") {
+        val device = device("android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
+        val setting = device("android.hardware.bydauto.setting.BYDAutoSettingDevice")
+        val sendState = device.javaClass.getMethod("sendCallState", Int::class.java)
+        val setCallState = setting.javaClass.getMethod("setCallState", Int::class.java)
+        val setBtCallState = setting.javaClass.getMethod("setBTCallState", Int::class.java)
+        fun end() {
+            println("call=${setCallState.invoke(setting, NOT_IN_CALL)}")
+            println("bt=${setBtCallState.invoke(setting, BT_ENDED)}")
             println("state=${sendState.invoke(device, STATE_NO_CALL)}")
+        }
+        if (args.getOrNull(0) != "show") {
+            end()
             return
         }
-        val sendInfo = type.getMethod("sendCallInfo", ByteArray::class.java)
-        val sendTime = type.getMethod("sendCallTime", Int::class.java, Int::class.java, Int::class.java)
-        val name = String(java.util.Base64.getDecoder().decode(args.getOrNull(1) ?: ""), Charsets.UTF_8)
+        val sendInfo = device.javaClass.getMethod("sendCallInfo", ByteArray::class.java)
+        val sendTime = device.javaClass.getMethod("sendCallTime", Int::class.java, Int::class.java, Int::class.java)
+        // BYD's Bluetooth call states: 1 incoming, 2 outgoing, 3 in a call.
+        val btState = when (args.getOrNull(1)) {
+            "ringing" -> 1
+            "dialing" -> 2
+            else -> 3
+        }
+        val name = String(java.util.Base64.getDecoder().decode(args.getOrNull(2) ?: ""), Charsets.UTF_8)
         val bytes = ClusterCallState.text(name).toByteArray(Charsets.UTF_16LE)
+        println("call=${setCallState.invoke(setting, IN_CALL)}")
+        println("bt=${setBtCallState.invoke(setting, btState)}")
         println("info=${sendInfo.invoke(device, bytes)}")
         println("state=${sendState.invoke(device, STATE_CALL)}")
-        val since = args.getOrNull(2)?.toLongOrNull()
+        val since = args.getOrNull(3)?.toLongOrNull()
         if (since == null) {
             println("time=${sendTime.invoke(device, TIME_UNKNOWN, TIME_UNKNOWN, TIME_UNKNOWN)}")
             return
         }
-        val diplay = args.getOrNull(3)?.let { File("/proc/$it") }
+        val diplay = args.getOrNull(4)?.let { File("/proc/$it") }
         while (diplay == null || diplay.exists()) {
             val seconds = ((System.currentTimeMillis() - since) / 1000).coerceAtLeast(0)
             val hours = (seconds / 3600).toInt()
@@ -260,17 +281,21 @@ object BydClusterCallTool {
             Thread.sleep(1000 - (System.currentTimeMillis() - since) % 1000)
         }
         // The call ended, DiPlay is gone, or the call is implausibly long: do not leave it on the dashboard.
-        sendState.invoke(device, STATE_NO_CALL)
+        end()
     }
 
+    private var systemContext: Any? = null
+
     @SuppressLint("PrivateApi")
-    private fun device(): Any {
-        runCatching { android.os.Looper.prepareMainLooper() }
-        val thread = Class.forName("android.app.ActivityThread")
-        val main = thread.getMethod("systemMain").invoke(null)
-        val context = thread.getMethod("getSystemContext").invoke(main)
-        val deviceClass = Class.forName("android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
-        // getInstance checks BYDAUTO_INSTRUMENT_COMMON on the caller's side only; autoservice itself
+    private fun device(className: String): Any {
+        val context = systemContext ?: run {
+            runCatching { android.os.Looper.prepareMainLooper() }
+            val thread = Class.forName("android.app.ActivityThread")
+            val main = thread.getMethod("systemMain").invoke(null)
+            thread.getMethod("getSystemContext").invoke(main).also { systemContext = it }
+        }
+        val deviceClass = Class.forName(className)
+        // getInstance checks the BYDAUTO_* permission on the caller's side only; autoservice itself
         // accepts the shell user, so build the device the way getInstance does.
         return try {
             deviceClass.getMethod("getInstance", Context::class.java).invoke(null, context)
