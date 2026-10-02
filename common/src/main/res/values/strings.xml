@@ -673,4 +673,7 @@
     <string name="side_panel_description">CarPlay can move to two thirds of the screen while DiPlay shows a panel in the rest: on the passenger\'s side of a landscape screen, at the bottom of a portrait one (clock and, where it is read, the battery). Show and hide it from the in-session menu. Applies at the next connection.</string>
     <string name="side_panel_show">Side panel</string>
     <string name="side_panel_full_screen">⤢ Full screen</string>
+    <string name="lab_mic_probe">Lab: microphone check (30 s)</string>
+    <string name="lab_mic_probe_running">Listening to the car microphone for 30 s, numbers only…</string>
+    <string name="lab_mic_probe_busy">The microphone check is already running</string>
 </resources>

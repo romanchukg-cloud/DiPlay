@@ -625,4 +625,7 @@
     <string name="side_panel_description">CarPlay може переходити на дві третини екрана, а DiPlay показує в решті свою панель: з боку пасажира на горизонтальному екрані, знизу на вертикальному (годинник і заряд, якщо його зчитано). Показуйте й ховайте її з меню під час сесії. Застосовується з наступного підключення.</string>
     <string name="side_panel_show">Бічна панель</string>
     <string name="side_panel_full_screen">⤢ На весь екран</string>
+    <string name="lab_mic_probe">Лабораторія: перевірка мікрофона (30 с)</string>
+    <string name="lab_mic_probe_running">Слухаю мікрофон машини 30 с, лише цифри…</string>
+    <string name="lab_mic_probe_busy">Перевірка мікрофона вже триває</string>
 </resources>
