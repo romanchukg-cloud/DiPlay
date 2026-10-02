@@ -295,6 +295,11 @@ class AirPlaySession(
     internal fun setVideoPlaybackAllowed(allowed: Boolean): VideoPlaybackDelivery =
         videoPlaybackAvailability.setDesired(allowed)
 
+    /** EXPERIMENT: tells the iPhone whether the car is moving (limited UI) or parked (full UI). */
+    fun setLimitedUI(limited: Boolean): Boolean = config.limitedUiByGear && sendCommand(
+        linkedMapOf("type" to "setLimitedUI", "params" to linkedMapOf("limitedUI" to limited)),
+    )
+
     private fun sendCommandLocked(command: Map<String, Any?>, extraHeaders: String = ""): Boolean {
         val socket = eventSocket ?: return false
         val cipher = eventCipher ?: return false

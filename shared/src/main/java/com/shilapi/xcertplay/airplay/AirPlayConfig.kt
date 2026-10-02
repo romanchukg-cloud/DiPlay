@@ -56,4 +56,9 @@ data class AirPlayConfig(
      * sends back (AuxIn/AuxOut stream setups, Siri commands). No audio is provided for it yet.
      */
     val enhancedSiriProbe: Boolean = false,
+    /**
+     * EXPERIMENT: declare limitedUIElements and send setLimitedUI from the car's gear (limited unless in P),
+     * so the iPhone knows when the car is parked. Without it the iPhone treats the car as always moving.
+     */
+    val limitedUiByGear: Boolean = false,
 )

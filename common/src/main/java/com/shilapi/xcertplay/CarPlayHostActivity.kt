@@ -3373,7 +3373,9 @@ class CarPlayHostActivity : ComponentActivity() {
             oemLabel = oemLabel,
             icons = listOf(loadAirPlayIcon()),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
-            enhancedSiriProbe = true, // EXPERIMENT: lab build only
+            // EXPERIMENT: the Enhanced Siri probe made the iPhone use its own mic and speaker for Siri.
+            enhancedSiriProbe = false,
+            limitedUiByGear = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this), // EXPERIMENT
         )
     }
 
