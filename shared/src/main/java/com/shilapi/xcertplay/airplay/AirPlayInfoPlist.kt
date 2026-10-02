@@ -73,6 +73,8 @@ object AirPlayInfoPlist {
             }
         }
         if (config.hevc) info["hevcInfo"] = emptyMap<String, Any?>()
+        // EXPERIMENT: the key CarPlay Simulator and BYD's own CarPlay pair with the enhancedSiri feature.
+        if (config.enhancedSiriProbe) info["enhancedSiriInfo"] = linkedMapOf<String, Any?>("enhancedSiriButton" to true)
         if (config.videoInCar) {
             // The iPhone tears down a session that enables videoPlayback without this key.
             val legacy = features(config)

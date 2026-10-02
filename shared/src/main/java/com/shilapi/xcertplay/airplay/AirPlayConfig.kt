@@ -51,4 +51,9 @@ data class AirPlayConfig(
     val icons: List<AirPlayIcon> = emptyList(),
     /** iOS 27 video in car (see [VideoInCar]); video plays only while [VideoInCar.allowed]. */
     val videoInCar: Boolean = false,
+    /**
+     * EXPERIMENT: offer Enhanced Siri with the button mode only (enhancedSiriInfo) and log what the iPhone
+     * sends back (AuxIn/AuxOut stream setups, Siri commands). No audio is provided for it yet.
+     */
+    val enhancedSiriProbe: Boolean = false,
 )

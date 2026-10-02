@@ -638,6 +638,7 @@ class AirPlaySession(
             response["keepAlivePort"] = openKeepAlive()
         }
         val features = setupEnabledFeatures(config, dict["features"] as? List<*>)
+        if (config.enhancedSiriProbe) debugLog("airplay SETUP proposed features=${dict["features"]} enabled=$features")
         val videoPlaybackEnabled = VideoInCar.FEATURE in features
         val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)
         debugLog("airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery")
@@ -703,6 +704,10 @@ class AirPlaySession(
         val type = string(body["type"])
         val params = asMap(body["params"]) ?: emptyMap()
         debugLog("airplay command type=$type keys=${params.keys.sorted()}")
+        // EXPERIMENT: the whole command while probing Enhanced Siri (not proxy parameters, which carry secrets).
+        if (config.enhancedSiriProbe && type != "setProxyParameters" && params["data"] !is ByteArray) {
+            debugLog("airplay command body type=$type params=${describeForLog(params)}")
+        }
         val streamId = request.headers["x-apple-streamid"]?.toLongOrNull()
         val data = params["data"] as? ByteArray
         if (streamId != null && data != null) {
@@ -918,6 +923,9 @@ class AirPlaySession(
     }
 }
 
+/** EXPERIMENT: the Enhanced Siri feature name, as CarPlay Simulator and BYD's own CarPlay use it. */
+internal const val ENHANCED_SIRI_FEATURE = "enhancedSiri"
+
 /** The features SETUP enables; video in car only when configured and the iPhone [proposed] it. */
 internal fun setupEnabledFeatures(config: AirPlayConfig, proposed: List<*>?): List<String> {
     val features = mutableListOf<String>()
@@ -926,6 +934,7 @@ internal fun setupEnabledFeatures(config: AirPlayConfig, proposed: List<*>?): Li
     features.add("viewAreas")
     if (config.cluster != null) features.add("altScreen")
     if (config.videoInCar && proposed.orEmpty().contains(VideoInCar.FEATURE)) features.add(VideoInCar.FEATURE)
+    if (config.enhancedSiriProbe && proposed.orEmpty().contains(ENHANCED_SIRI_FEATURE)) features.add(ENHANCED_SIRI_FEATURE)
     return features
 }
 
@@ -965,3 +974,11 @@ private fun asMap(value: Any?): Map<String, Any?>? {
 private fun string(value: Any?): String = value as? String ?: ""
 
 private fun long(value: Any?): Long? = (value as? Number)?.toLong()
+
+/** EXPERIMENT: a plist value for the log; byte arrays as their size, so keys and audio never print. */
+internal fun describeForLog(value: Any?): String = when (value) {
+    is ByteArray -> "<${value.size} bytes>"
+    is Map<*, *> -> value.entries.joinToString(", ", "{", "}") { "${it.key}=${describeForLog(it.value)}" }
+    is List<*> -> value.joinToString(", ", "[", "]") { describeForLog(it) }
+    else -> value.toString()
+}

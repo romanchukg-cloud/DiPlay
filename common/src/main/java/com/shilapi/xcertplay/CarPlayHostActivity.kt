@@ -3373,6 +3373,7 @@ class CarPlayHostActivity : ComponentActivity() {
             oemLabel = oemLabel,
             icons = listOf(loadAirPlayIcon()),
             videoInCar = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this),
+            enhancedSiriProbe = true, // EXPERIMENT: lab build only
         )
     }
 
