@@ -36,6 +36,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.shilapi.xcertplay.adb.LocalAdb
+import com.shilapi.xcertplay.media.SiriMicrophone
 import com.shilapi.xcertplay.airplay.CarPlayClusterDisplay
 import com.shilapi.xcertplay.airplay.CarPlayDisplayScale
 import com.shilapi.xcertplay.airplay.ClusterTurnCardOverlay
@@ -634,6 +635,12 @@ class DiPlayActivity : ComponentActivity() {
                 }
                 toast(getString(if (started) R.string.lab_mic_probe_running else R.string.lab_mic_probe_busy))
             }, matchButton(10, 56))
+            // EXPERIMENT (lab): which capture path feeds Siri; applies from the next time Siri listens.
+            lateinit var siriMic: android.widget.Button
+            siriMic = button(siriMicrophoneLabel(SiriMicrophone.load(this)), false) {
+                siriMic.text = siriMicrophoneLabel(SiriMicrophone.cycle(this))
+            }
+            card.addView(siriMic, matchButton(10, 56))
         }
         section(content, getString(R.string.location), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.report_location_to_iphone),
@@ -3160,6 +3167,11 @@ class DiPlayActivity : ComponentActivity() {
         setPadding(dp(16), 0, dp(16), 0); minHeight = dp(56); stateListAnimator = null
         setOnClickListener { click() }
     }
+    private fun siriMicrophoneLabel(mode: SiriMicrophone.Mode) = getString(R.string.lab_siri_microphone, getString(when (mode) {
+        SiriMicrophone.Mode.RECOGNITION -> R.string.lab_siri_microphone_recognition
+        SiriMicrophone.Mode.RECOGNITION_GAIN -> R.string.lab_siri_microphone_gain
+        SiriMicrophone.Mode.CALL -> R.string.lab_siri_microphone_call
+    }))
     private fun rounded(color: Int, stroke: Int) = GradientDrawable().apply { setColor(color); cornerRadius = dp(20).toFloat(); setStroke(dp(1), stroke) }
     private fun matchButton(top: Int = 0, height: Int = 68) = LinearLayout.LayoutParams(-1, dp(height)).apply { topMargin = dp(top) }
     private fun space(height: Int) = View(this).apply { layoutParams = LinearLayout.LayoutParams(1, dp(height)) }

@@ -628,4 +628,8 @@
     <string name="lab_mic_probe">Лабораторія: перевірка мікрофона (30 с)</string>
     <string name="lab_mic_probe_running">Слухаю мікрофон машини 30 с, лише цифри…</string>
     <string name="lab_mic_probe_busy">Перевірка мікрофона вже триває</string>
+    <string name="lab_siri_microphone">Лаб: мікрофон Siri: %1$s</string>
+    <string name="lab_siri_microphone_recognition">розпізнавання (стандарт)</string>
+    <string name="lab_siri_microphone_gain">розпізнавання +12 дБ</string>
+    <string name="lab_siri_microphone_call">дзвінок (без відлуння)</string>
 </resources>
