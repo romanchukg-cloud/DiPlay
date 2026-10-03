@@ -37,6 +37,9 @@ internal class MicrophoneUplink(
     @Volatile private var socket: DatagramSocket? = null
     @Volatile private var opusEncoder: OpusEncoder? = null
     @Volatile private var effects: List<AudioEffect> = emptyList()
+    /** EXPERIMENT (lab): the Siri capture path chosen in the settings, fixed for this stream. */
+    private val siriMode = if (config.audioType == "speechrecognition") SiriMicrophone.mode else null
+    private val level = SiriLevel()
     private var thread: Thread? = null
 
     fun start(): Boolean {
@@ -61,9 +64,14 @@ internal class MicrophoneUplink(
 
         val source = when (config.audioType) {
             "telephony" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
-            "speechrecognition" -> MediaRecorder.AudioSource.VOICE_RECOGNITION
+            "speechrecognition" -> if (siriMode == SiriMicrophone.Mode.CALL) {
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION
+            } else {
+                MediaRecorder.AudioSource.VOICE_RECOGNITION
+            }
             else -> MediaRecorder.AudioSource.MIC
         }
+        siriMode?.let { Log.i(TAG, "Microphone: Siri lab mode=$it source=$source") }
         val nextEncoder = if (config.codec == AudioCodecKind.OPUS) {
             OpusEncoder(config.bitrate ?: 48_000).takeIf { it.available }
         } else {
@@ -122,7 +130,9 @@ internal class MicrophoneUplink(
         socket = nextSocket
         opusEncoder = nextEncoder
         return try {
-            if (config.audioType == "telephony") effects = voiceEffects(nextRecorder.audioSessionId)
+            if (config.audioType == "telephony" || siriMode == SiriMicrophone.Mode.CALL) {
+                effects = voiceEffects(nextRecorder.audioSessionId)
+            }
             nextRecorder.startRecording()
             stats.started(routeType(nextRecorder))
             thread = Thread({ capture(nextRecorder, nextSocket) }, "carplay-mic").apply {
@@ -225,6 +235,10 @@ internal class MicrophoneUplink(
     }
 
     private fun sendFrame(socket: DatagramSocket, counters: MicrophoneCounters, frame: ByteArray) {
+        if (siriMode != null) {
+            level.measure(frame, if (siriMode == SiriMicrophone.Mode.RECOGNITION_GAIN) SiriMicrophone.GAIN else 1)
+                ?.let { Log.i(TAG, "Microphone: Siri level mode=$siriMode $it") }
+        }
         val bodies = if (config.codec == AudioCodecKind.OPUS) {
             opusEncoder?.encode(frame).orEmpty()
         } else {
@@ -314,6 +328,48 @@ internal class MicrophoneUplink(
         val currentEncoder = opusEncoder
         opusEncoder = null
         currentEncoder?.close()
+    }
+
+    /**
+     * EXPERIMENT (lab): applies the gain to 16-bit little-endian PCM in place and reports, about once a
+     * second, the level Siri gets: RMS and peak in dBFS and the share of clipped samples. Numbers only.
+     */
+    private class SiriLevel {
+        private var sumSquares = 0.0
+        private var samples = 0
+        private var peak = 0
+        private var clipped = 0
+
+        fun measure(frame: ByteArray, gain: Int): String? {
+            var i = 0
+            while (i + 1 < frame.size) {
+                var v = ((frame[i + 1].toInt() shl 8) or (frame[i].toInt() and 0xff)) * gain
+                if (v > Short.MAX_VALUE || v < Short.MIN_VALUE) {
+                    clipped++
+                    v = v.coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt())
+                }
+                if (gain != 1) {
+                    frame[i] = v.toByte()
+                    frame[i + 1] = (v shr 8).toByte()
+                }
+                sumSquares += v.toDouble() * v
+                peak = maxOf(peak, kotlin.math.abs(v))
+                samples++
+                i += 2
+            }
+            if (samples < SAMPLES_PER_REPORT) return null
+            val rms = kotlin.math.sqrt(sumSquares / samples)
+            val report = "rmsDbfs=${dbfs(rms)} peakDbfs=${dbfs(peak.toDouble())} clippedPermille=${clipped * 1000 / samples}"
+            sumSquares = 0.0; samples = 0; peak = 0; clipped = 0
+            return report
+        }
+
+        private fun dbfs(value: Double): Int =
+            if (value <= 0) -99 else (20 * kotlin.math.log10(value / Short.MAX_VALUE)).toInt()
+
+        private companion object {
+            const val SAMPLES_PER_REPORT = 48_000
+        }
     }
 
     private companion object {

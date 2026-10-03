@@ -3358,6 +3358,7 @@ class CarPlayHostActivity : ComponentActivity() {
         appendLog(requestSummary)
         appendLog(support.details)
         appendLog(effectiveSummary)
+        com.shilapi.xcertplay.media.SiriMicrophone.load(this) // EXPERIMENT (lab)
         return AirPlayConfig(
             deviceName = "DiPlay",
             deviceId = DiPlayBootstrap.deviceId(airPlayIdentity),
