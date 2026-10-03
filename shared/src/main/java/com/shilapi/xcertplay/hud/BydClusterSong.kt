@@ -10,8 +10,18 @@ import java.lang.reflect.InvocationTargetException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-/** Dashboard song; [line] preserves title-only HUD text, [source] selects a note's music icon. */
-internal data class ClusterSong(val text: String, val playing: Boolean, val line: String = text, val source: Int? = null)
+/**
+ * Dashboard song: [text] is "Title — Artist" for one-line screens; [line] preserves title-only HUD text and is
+ * the title the dashboard shows, with the [artist] on its own line as BYD's own CarPlay sends them (lab);
+ * [source] selects a note's music icon.
+ */
+internal data class ClusterSong(
+    val text: String,
+    val playing: Boolean,
+    val line: String = text,
+    val source: Int? = null,
+    val artist: String? = null,
+)
 
 /**
  * The CarPlay song for the dashboard, from iAP2 NowPlayingUpdate (0x5001): title (1) and artist (12)
@@ -41,7 +51,9 @@ internal class ClusterSongState {
         runCatching { body.optionalGroup(PLAYBACK)?.optionalU8(STATUS) }.getOrNull()?.let { status ->
             playing = status == STATUS_PLAYING || status == STATUS_SEEK_FORWARD || status == STATUS_SEEK_BACKWARD
         }
-        val next = text(title, artist)?.let { ClusterSong(it, playing, title!!.trim()) }
+        val next = text(title, artist)?.let {
+            ClusterSong(it, playing, title!!.trim(), artist = artist?.trim()?.takeIf { a -> a.isNotEmpty() })
+        }
         if (next == last) return null
         last = next
         return next
@@ -104,7 +116,7 @@ internal object BydClusterSong {
     private const val ON_CHANGE_MILLIS = 5_000L
 
     // An empty, stopped card: how the song leaves the dashboard between new songs.
-    private val EMPTY = ClusterSong(" ", false)
+    private val EMPTY = ClusterSong(" ", false, " ", artist = " ") // lab: the artist line empties too
 
     private val writer = Executors.newSingleThreadScheduledExecutor { Thread(it, "diplay-cluster-song").apply { isDaemon = true } }
     private val state = ClusterSongState() // guards wanted and note too
@@ -209,7 +221,7 @@ internal object BydClusterSong {
         val token = Any()
         val card = synchronized(state) {
             note = token
-            ClusterSong(text, state.current()?.playing ?: true, source = source).also { wanted = it }
+            ClusterSong(text, state.current()?.playing ?: true, source = source, artist = " ").also { wanted = it } // lab: no artist line
         }
         writer.execute { write(app, card) }
         writer.schedule({ endNote(app, token) }, NOTE_MILLIS, TimeUnit.MILLISECONDS)
@@ -251,13 +263,15 @@ internal object BydClusterSong {
     private fun write(app: Context, song: ClusterSong) {
         // Only the newest song matters; older queued ones are skipped.
         if (synchronized(state) { wanted } != song || song == shown) return
-        val text = Base64.encodeToString(song.text.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+        // As BYD's own CarPlay (lab): the title in the card, the artist on its own.
+        val text = encode(if (song.artist != null) song.line else song.text)
+        val artist = song.artist?.let(::encode) ?: "-"
         val playing = when {
             song == EMPTY -> STATE_STOPPED
             song.playing -> STATE_PLAYING
             else -> STATE_PAUSED
         }
-        if (run(app, "${song.source ?: SOURCE_OTHERS} $playing $text")) {
+        if (run(app, "${song.source ?: SOURCE_OTHERS} $playing $text $artist")) {
             shown = song
             if (!firstLogged) {
                 firstLogged = true
@@ -265,6 +279,8 @@ internal object BydClusterSong {
             }
         }
     }
+
+    private fun encode(text: String): String = Base64.encodeToString(text.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
 
     private fun clear(app: Context) {
         if (shown == null || synchronized(state) { wanted } != null) return
@@ -285,8 +301,9 @@ internal object BydClusterSong {
 /**
  * Runs under the head unit's adb shell through app_process, not in DiPlay: writes the dashboard's music
  * source, play state and song text to the instrument (device 1007), as BYD's media controller does
- * (source 0x33F00030, state 0x43E0000A, text 0x43FB1008 in UTF-16LE). Arguments: source, state and
- * base64 UTF-8 text, "-" to skip one. Prints "name=result" per write; 0 is success.
+ * (source 0x33F00030, state 0x43E0000A, text 0x43FB1008 in UTF-16LE), and like BYD's own CarPlay the artist
+ * on its own (BYDAutoAudioDevice sendSingerName). Arguments: source, state, base64 UTF-8 text and base64
+ * UTF-8 artist, "-" to skip one. Prints "name=result" per write; 0 is success.
  */
 object BydClusterSongTool {
     private const val DEVICE = 1007
@@ -306,20 +323,29 @@ object BydClusterSongTool {
         }
     }
 
+    private var systemContext: Any? = null
+
+    // getInstance checks the BYDAUTO_* permission on the caller's side only; autoservice itself accepts
+    // the shell user, so build the device the way getInstance does.
     @SuppressLint("PrivateApi")
-    private fun write(args: Array<String>) {
-        runCatching { android.os.Looper.prepareMainLooper() }
-        val thread = Class.forName("android.app.ActivityThread")
-        val main = thread.getMethod("systemMain").invoke(null)
-        val context = thread.getMethod("getSystemContext").invoke(main)
-        val deviceClass = Class.forName("android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
-        // getInstance checks BYDAUTO_INSTRUMENT_COMMON on the caller's side only; autoservice itself
-        // accepts the shell user, so build the device the way getInstance does.
-        val device = try {
+    private fun device(className: String): Any {
+        val context = systemContext ?: run {
+            runCatching { android.os.Looper.prepareMainLooper() }
+            val thread = Class.forName("android.app.ActivityThread")
+            val main = thread.getMethod("systemMain").invoke(null)
+            thread.getMethod("getSystemContext").invoke(main).also { systemContext = it }
+        }
+        val deviceClass = Class.forName(className)
+        return try {
             deviceClass.getMethod("getInstance", Context::class.java).invoke(null, context)
         } catch (_: InvocationTargetException) {
             deviceClass.getDeclaredConstructor(Context::class.java).apply { isAccessible = true }.newInstance(context)
         }
+    }
+
+    private fun write(args: Array<String>) {
+        val device = device("android.hardware.bydauto.instrument.BYDAutoInstrumentDevice")
+        val deviceClass = device.javaClass
         val setState = deviceClass.getMethod("setMediaState", Int::class.java, Int::class.java, Int::class.java)
         val setInfo = deviceClass.getMethod("setMediaInfo", Int::class.java, Int::class.java, ByteArray::class.java)
         args.getOrNull(0)?.takeIf { it != "-" }?.let { println("source=${setState.invoke(device, DEVICE, SOURCE, it.toInt())}") }
@@ -327,6 +353,12 @@ object BydClusterSongTool {
         args.getOrNull(2)?.takeIf { it != "-" }?.let { encoded ->
             val text = String(java.util.Base64.getDecoder().decode(encoded), Charsets.UTF_8).toByteArray(Charsets.UTF_16LE)
             println("text=${if (text.size > ClusterSongState.MAX_TEXT_BYTES) "ERR too long" else setInfo.invoke(device, DEVICE, TEXT, text)}")
+        }
+        args.getOrNull(3)?.takeIf { it != "-" }?.let { encoded ->
+            // BYD refuses an empty singer name (-2147482648), so a blank artist line is a single space.
+            val artist = ClusterSongState.text(String(java.util.Base64.getDecoder().decode(encoded), Charsets.UTF_8), null) ?: " "
+            val audio = device("android.hardware.bydauto.audio.BYDAutoAudioDevice")
+            println("artist=${audio.javaClass.getMethod("sendSingerName", String::class.java).invoke(audio, artist)}")
         }
     }
 
