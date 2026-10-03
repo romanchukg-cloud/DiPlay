@@ -102,11 +102,13 @@ internal class ClusterSongState {
  * Optional, needs ADB over network: shows the CarPlay song in the dashboard's music card. Apps cannot
  * write it (BYDAutoInstrumentDevice checks a BYD permission), but autoservice accepts the adb shell
  * user, so DiPlay runs [BydClusterSongTool] from its own APK under the head unit's adb shell. The card
- * appears as BYD's "other" music source; CarPlay's own source value is not drawn on this dashboard.
+ * appears as BYD's local music source, whose icon reads best on this dashboard; CarPlay's own source
+ * value is not drawn here. EXPERIMENT (lab): it was "other" (11). This dashboard draws only the source
+ * icon, the title and the artist: no progress bar or time for any source (tested 1, 11, 18).
  */
 internal object BydClusterSong {
     private const val TAG = "DiPlay-BYD-Song"
-    private const val SOURCE_OTHERS = 11
+    private const val SOURCE_LOCAL_MUSIC = 1
     private const val STATE_PLAYING = 1
     private const val STATE_PAUSED = 2
     private const val STATE_STOPPED = 3
@@ -271,7 +273,7 @@ internal object BydClusterSong {
             song.playing -> STATE_PLAYING
             else -> STATE_PAUSED
         }
-        if (run(app, "${song.source ?: SOURCE_OTHERS} $playing $text $artist")) {
+        if (run(app, "${song.source ?: SOURCE_LOCAL_MUSIC} $playing $text $artist")) {
             shown = song
             if (!firstLogged) {
                 firstLogged = true
