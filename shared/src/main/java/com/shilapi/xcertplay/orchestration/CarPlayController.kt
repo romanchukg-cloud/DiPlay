@@ -531,14 +531,17 @@ class CarPlayController(
      * EXPERIMENT (lab): asks the iPhone to draw CarPlay in another of the main screen's view areas
      * (0 = the whole screen, 1 = the declared right-hand part), without reconnecting.
      */
-    fun labViewArea(index: Int): Boolean {
+    fun labViewArea(index: Int, animationMillis: Int? = null, adjacent: List<Int>? = null): Boolean {
         if (closed) return false
         val session = activeSession ?: return false
         return try {
             touchExecutor.execute {
-                val sent = session.sendCommand(mapOf("type" to "updateViewArea", "params" to mapOf(
-                    "uuid" to com.shilapi.xcertplay.airplay.AirPlayInfoPlist.MAIN_UUID, "viewAreaIndex" to index)))
-                debugLog("Lab view area $index sent=$sent")
+                val params = linkedMapOf<String, Any?>(
+                    "uuid" to com.shilapi.xcertplay.airplay.AirPlayInfoPlist.MAIN_UUID, "viewAreaIndex" to index)
+                animationMillis?.let { params["animationDurationMillis"] = it }
+                adjacent?.let { params["adjacentViewAreas"] = it }
+                val sent = session.sendCommand(mapOf("type" to "updateViewArea", "params" to params))
+                debugLog("Lab view area $params sent=$sent")
             }
             true
         } catch (_: Exception) {

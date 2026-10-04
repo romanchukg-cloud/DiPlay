@@ -28,7 +28,9 @@ object LabSplitScreen {
 class LabViewAreaReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val index = intent.getIntExtra("index", 0)
-        val sent = CarPlayBackgroundSession.snapshot()?.controller?.labViewArea(index)
-        Log.i("DiPlay-SplitLab", "view area $index requested=$sent")
+        val millis = intent.getIntExtra("millis", -1).takeIf { it >= 0 }
+        val adjacent = intent.getStringExtra("adjacent")?.split(',')?.mapNotNull { it.trim().toIntOrNull() }
+        val sent = CarPlayBackgroundSession.snapshot()?.controller?.labViewArea(index, millis, adjacent)
+        Log.i("DiPlay-SplitLab", "view area $index millis=$millis adjacent=$adjacent requested=$sent")
     }
 }

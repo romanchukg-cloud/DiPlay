@@ -194,6 +194,8 @@ object AirPlayInfoPlist {
             },
         )
         entry["initialViewArea"] = 0
+        // EXPERIMENT (lab): the car switches view areas (key from Apple's CarPlaySDK strings).
+        if (display.labSplitLeftPixels != null) entry["viewAreaTransitionControl"] = true
         if (display.initialUrl != null) entry["initialURL"] = display.initialUrl
         return entry
     }
