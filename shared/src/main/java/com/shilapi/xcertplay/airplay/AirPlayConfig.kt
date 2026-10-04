@@ -42,6 +42,8 @@ data class AirPlayDisplayConfig(
      * to turn CarPlay with the screen by updateViewArea instead of reconnecting. Value = the short side.
      */
     val labRotationShortSide: Int? = null,
+    /** EXPERIMENT (lab): the rotation area to start in (0 landscape, 1 portrait). */
+    val labRotationInitialArea: Int = 0,
 )
 
 /** One OEM homescreen icon. */

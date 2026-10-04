@@ -202,7 +202,7 @@ object AirPlayInfoPlist {
                 ))
             },
         )
-        entry["initialViewArea"] = 0
+        entry["initialViewArea"] = if (display.labRotationShortSide != null) display.labRotationInitialArea else 0
         // EXPERIMENT (lab): the car switches view areas (key from Apple's CarPlaySDK strings).
         if (display.labSplitLeftPixels != null || display.labEdgeAreas || display.labRotationShortSide != null) {
             entry["viewAreaTransitionControl"] = true
