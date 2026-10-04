@@ -21,6 +21,13 @@ object LabSplitScreen {
     fun setEnabled(context: Context, enabled: Boolean) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, enabled).apply()
 
+    /** EXPERIMENT: viewAreaStatusBarEdge to declare, or null to leave it to the iPhone. */
+    fun statusBarEdge(context: Context): Int? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt("status_bar_edge", -1).takeIf { it >= 0 }
+
+    fun setStatusBarEdge(context: Context, edge: Int?) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("status_bar_edge", edge ?: -1).apply()
+
     /** Where the right-hand area starts: a third of the stream, kept even for the encoder. */
     fun leftPixels(widthPixels: Int): Int = (widthPixels / 3) and 1.inv()
 }

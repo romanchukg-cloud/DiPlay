@@ -212,6 +212,7 @@ object AirPlayInfoPlist {
             "originXPixels" to view.left,
             "originYPixels" to view.top,
         )
+        display.labStatusBarEdge?.let { result["viewAreaStatusBarEdge"] = it } // EXPERIMENT (lab)
         val safe = display.safeArea ?: AirPlayInsets()
         val safeArea = linkedMapOf<String, Any?>(
             "widthPixels" to (width - safe.left - safe.right),

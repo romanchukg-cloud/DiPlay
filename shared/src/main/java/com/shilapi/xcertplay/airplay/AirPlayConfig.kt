@@ -27,6 +27,11 @@ data class AirPlayDisplayConfig(
      * profile declares (full 1920x720 plus the right 1280x720). The car switches with updateViewArea.
      */
     val labSplitLeftPixels: Int? = null,
+    /**
+     * EXPERIMENT (lab): viewAreaStatusBarEdge for every view area, where CarPlay puts its dock. CarPlay
+     * Simulator's StatusBarEdge has automatic, bottom and driver; the numbers are being tried.
+     */
+    val labStatusBarEdge: Int? = null,
 )
 
 /** One OEM homescreen icon. */
