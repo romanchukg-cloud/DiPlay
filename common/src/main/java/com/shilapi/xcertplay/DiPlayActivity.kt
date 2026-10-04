@@ -641,6 +641,18 @@ class DiPlayActivity : ComponentActivity() {
                 siriMic.text = siriMicrophoneLabel(SiriMicrophone.cycle(this))
             }
             card.addView(siriMic, matchButton(10, 56))
+            // EXPERIMENT (lab): what more the iPhone takes from a car; each applies on reconnect.
+            for ((probe, title) in listOf(
+                com.shilapi.xcertplay.transport.LabIap2Probes.VEHICLE_EXTRAS to R.string.lab_probe_vehicle_extras,
+                com.shilapi.xcertplay.transport.LabIap2Probes.ROAD_OBJECTS to R.string.lab_probe_road_objects,
+                com.shilapi.xcertplay.transport.LabIap2Probes.APP_DISCOVERY to R.string.lab_probe_app_discovery,
+            )) {
+                toggle(card, getString(title), getString(R.string.lab_probe_description),
+                    com.shilapi.xcertplay.transport.LabIap2Probes.enabled(this, probe)) {
+                    com.shilapi.xcertplay.transport.LabIap2Probes.setEnabled(this, probe, it)
+                    reconnectForClusterMap()
+                }
+            }
         }
         section(content, getString(R.string.location), R.drawable.ic_dp_navigation) { card ->
             toggle(card, getString(R.string.report_location_to_iphone),

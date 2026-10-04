@@ -676,6 +676,10 @@
     <string name="lab_mic_probe">Lab: microphone check (30 s)</string>
     <string name="lab_mic_probe_running">Listening to the car microphone for 30 s, numbers only…</string>
     <string name="lab_mic_probe_busy">The microphone check is already running</string>
+    <string name="lab_probe_vehicle_extras">Lab: offer temperatures, wipers, pressure, passenger seat</string>
+    <string name="lab_probe_road_objects">Lab: offer road sign, lane and object detection</string>
+    <string name="lab_probe_app_discovery">Lab: ask the iPhone for its CarPlay apps</string>
+    <string name="lab_probe_description">Logs what the iPhone answers. Reconnects CarPlay; if CarPlay no longer starts, turn it off.</string>
     <string name="lab_siri_microphone">Lab: Siri microphone: %1$s</string>
     <string name="lab_siri_microphone_recognition">recognition (default)</string>
     <string name="lab_siri_microphone_gain">recognition +12 dB</string>

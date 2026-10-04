@@ -52,7 +52,7 @@ object Iap2VehicleStatus {
     private const val ENGINE_TYPE_ELECTRIC = 2
 
     /** IdentificationInformation params 20 (VehicleInformation) and 21 (VehicleStatus). */
-    fun Iap2BodyBuilder.electricVehicleComponents(name: String, connectors: EvChargingConnectors) {
+    fun Iap2BodyBuilder.electricVehicleComponents(name: String, connectors: EvChargingConnectors, labExtras: Boolean = false) {
         group(20) {
             u16(0, 3) // Identifier
             string(1, name) // Name
@@ -70,6 +70,7 @@ object Iap2VehicleStatus {
             void(15) // RangeWarningElectric
             void(21) // ElectricChargeInfo
             void(30) // MaxRangeInfo
+            if (labExtras) with(LabIap2Probes) { vehicleStatusExtras() } // EXPERIMENT (lab)
         }
     }
 

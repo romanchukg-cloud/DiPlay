@@ -59,6 +59,8 @@ data class Iap2IdentificationConfig(
     val vehicleSpeedEnabled: Boolean = false,
     /** Also offer the car's heading ($GPHDT) in the location component; needs [locationInformationEnabled]. */
     val vehicleHeadingEnabled: Boolean = false,
+    /** EXPERIMENT (lab): the probes switched on, see [LabIap2Probes]. */
+    val labProbes: Set<String> = emptySet(),
 ) {
     constructor(
         name: String,
@@ -206,12 +208,23 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
             } else {
                 MESSAGES_RECEIVED_FROM_PHONE
             }
-            if (config.vehicleStatusEnabled) {
+            val vehicleExtras = LabIap2Probes.VEHICLE_EXTRAS in config.labProbes
+            if (config.vehicleStatusEnabled || vehicleExtras) {
                 sentMessages += Iap2VehicleStatus.VEHICLE_STATUS_UPDATE
                 receivedMessages += intArrayOf(
                     Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES,
                     Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES,
                 )
+            }
+            if (LabIap2Probes.ROAD_OBJECTS in config.labProbes) {
+                sentMessages += LabIap2Probes.ROAD_OBJECT_DETECTION_UPDATE
+                receivedMessages += intArrayOf(LabIap2Probes.START_ROAD_OBJECT_DETECTION, LabIap2Probes.STOP_ROAD_OBJECT_DETECTION)
+            }
+            if (LabIap2Probes.APP_DISCOVERY in config.labProbes) {
+                sentMessages += intArrayOf(
+                    LabIap2Probes.START_APP_DISCOVERY, LabIap2Probes.STOP_APP_DISCOVERY, LabIap2Probes.REQUEST_APP_ICONS,
+                )
+                receivedMessages += intArrayOf(LabIap2Probes.APP_DISCOVERY_UPDATE, LabIap2Probes.APP_ICON)
             }
             return Iap2Messages.build(Iap2Endpoints.IDENTIFICATION_INFORMATION) {
                 string(0, config.name)
@@ -272,7 +285,17 @@ class Iap2IdentificationClient(private val session: Iap2Session) {
                         void(5)
                     }
                 }
-                if (config.vehicleStatusEnabled) electricVehicleComponents(config.manufacturer, config.chargingConnectors)
+                if (config.vehicleStatusEnabled) {
+                    electricVehicleComponents(config.manufacturer, config.chargingConnectors, vehicleExtras)
+                } else if (vehicleExtras) {
+                    // EXPERIMENT (lab): only the extra fields, without declaring an electric vehicle.
+                    group(21) {
+                        u16(0, 4) // Identifier
+                        string(1, config.manufacturer) // Name
+                        with(LabIap2Probes) { vehicleStatusExtras() }
+                    }
+                }
+                if (LabIap2Probes.ROAD_OBJECTS in config.labProbes) with(LabIap2Probes) { roadObjectDetectionComponent() }
                 if (config.locationInformationEnabled) {
                     group(22) {
                         u16(0, 0)
