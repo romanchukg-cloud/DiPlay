@@ -163,7 +163,12 @@ class CarPlayHostActivity : ComponentActivity() {
                 com.shilapi.xcertplay.transport.LabIap2Probes.VEHICLE_EXTRAS,
                 com.shilapi.xcertplay.transport.LabIap2Probes.ROAD_OBJECTS,
                 com.shilapi.xcertplay.transport.LabIap2Probes.APP_DISCOVERY,
-            ).filter { com.shilapi.xcertplay.transport.LabIap2Probes.enabled(this, it) }.toSet(),
+            ).filter { com.shilapi.xcertplay.transport.LabIap2Probes.enabled(this, it) }.toSet().also { probes ->
+                com.shilapi.xcertplay.transport.LabIap2Probes.extrasSource =
+                    if (com.shilapi.xcertplay.transport.LabIap2Probes.VEHICLE_EXTRAS in probes) {
+                        com.shilapi.xcertplay.hud.BydNavigationOutputs.labVehicleExtras(this)
+                    } else null
+            },
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),

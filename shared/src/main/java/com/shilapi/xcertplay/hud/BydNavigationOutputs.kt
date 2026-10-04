@@ -49,6 +49,10 @@ object BydNavigationOutputs {
     fun batteryStatus(context: Context): com.shilapi.xcertplay.transport.VehicleStatusProvider =
         BydBatteryStatus.also { it.start(context) }
 
+    /** EXPERIMENT (lab): outside temperature, wipers, hazard, ABS and TCS for the iPhone; read over adb. */
+    fun labVehicleExtras(context: Context): com.shilapi.xcertplay.transport.LabVehicleExtrasSource =
+        BydVehicleExtras.also { it.start(context) }
+
     /** The car's wheel speed and gear for the iPhone's dead reckoning; read over adb while asked for. */
     fun wheelSpeed(context: Context): com.shilapi.xcertplay.transport.VehicleSpeedSource =
         BydWheelSpeedSource.attach(context)
