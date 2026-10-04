@@ -120,6 +120,7 @@ object Iap2Endpoints {
             field(20, "VehicleInformation", Iap2WireType.GROUP),
             field(21, "VehicleStatus", Iap2WireType.GROUP),
             field(22, "LocationInformation", Iap2WireType.GROUP),
+            field(33, "RoadObjectDetection", Iap2WireType.GROUP), // EXPERIMENT (lab) probe
             field(
                 24,
                 "WirelessCarPlayTransport",
