@@ -158,6 +158,11 @@ class CarPlayHostActivity : ComponentActivity() {
             vehicleSpeedEnabled = locationReportingEnabled && com.shilapi.xcertplay.hud.BydOutputSettings.wheelSpeedToIphoneActive(this),
             // Lab: the car's heading, remembered between trips, for the iPhone's map at start.
             vehicleHeadingEnabled = locationReportingEnabled,
+            labProbes = listOf(
+                com.shilapi.xcertplay.transport.LabIap2Probes.VEHICLE_EXTRAS,
+                com.shilapi.xcertplay.transport.LabIap2Probes.ROAD_OBJECTS,
+                com.shilapi.xcertplay.transport.LabIap2Probes.APP_DISCOVERY,
+            ).filter { com.shilapi.xcertplay.transport.LabIap2Probes.enabled(this, it) }.toSet(),
         ),
         label = "DiPlay",
         hostName = "diplay-" + DiPlayBootstrap.deviceId(airPlayIdentity).replace(":", "").lowercase(),

@@ -59,6 +59,10 @@ class Iap2WirelessControlClient(
         for (subscription in Iap2WiredControlClient.subscriptions()) {
             send(subscription, deadlineNanos)
         }
+        if (LabIap2Probes.APP_DISCOVERY in identification.labProbes) {
+            send(LabIap2Probes.startAppDiscovery(), deadlineNanos)
+            onProgress("iap2 tx=0xad00 start-app-discovery (lab)")
+        }
         stage = Iap2WirelessControlStage.SUBSCRIBED
         onProgress("iap2 subscriptions sent")
         onReady()
@@ -206,6 +210,7 @@ class Iap2WirelessControlClient(
                     }
 
                     Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES, Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES -> {
+                        if (identification.labProbes.isNotEmpty()) onProgress(LabIap2Probes.describe(incoming))
                         vehicleStatus.handle(incoming) { send(it, deadlineNanos) }
                     }
 
@@ -215,6 +220,7 @@ class Iap2WirelessControlClient(
                     }
 
                     else -> {
+                        if (incoming.messageId in LabIap2Probes.LOGGED) onProgress(LabIap2Probes.describe(incoming))
                         onProgress("iap2 rx=0x${incoming.messageId.toString(16).padStart(4, '0')}")
                         onIncoming(incoming)
                         forwardedFrames++

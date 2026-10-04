@@ -612,6 +612,10 @@
     <string name="lab_mic_probe">Лабораторія: перевірка мікрофона (30 с)</string>
     <string name="lab_mic_probe_running">Слухаю мікрофон машини 30 с, лише цифри…</string>
     <string name="lab_mic_probe_busy">Перевірка мікрофона вже триває</string>
+    <string name="lab_probe_vehicle_extras">Лабораторія: температури, двірники, тиск, пасажир</string>
+    <string name="lab_probe_road_objects">Лабораторія: розпізнавання знаків, смуг і об\'єктів</string>
+    <string name="lab_probe_app_discovery">Лабораторія: запитати в iPhone список застосунків CarPlay</string>
+    <string name="lab_probe_description">Записує в лог відповідь iPhone. Перепідключає CarPlay; якщо CarPlay більше не запускається, вимкніть.</string>
     <string name="lab_siri_microphone">Лаб: мікрофон Siri: %1$s</string>
     <string name="lab_siri_microphone_recognition">розпізнавання (стандарт)</string>
     <string name="lab_siri_microphone_gain">розпізнавання +12 дБ</string>
