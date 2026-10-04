@@ -3427,7 +3427,7 @@ class CarPlayHostActivity : ComponentActivity() {
             }
         }
         appendLog("CarPlay size=${CarPlayUiScale.label(uiScalePercent)} canvas=${scaledDisplay.widthPixels}x${scaledDisplay.heightPixels}")
-        val display = scaledDisplay.copy(
+        val plainDisplay = scaledDisplay.copy(
             safeArea = AirPlaySafeArea.toInsets(
                 mapping = AirPlayPersistence.loadSafeAreaRect(this, size.width, size.height),
                 activityWidthPixels = size.width,
@@ -3440,6 +3440,12 @@ class CarPlayHostActivity : ComponentActivity() {
             labStatusBarEdge = LabSplitScreen.statusBarEdge(this),
             labEdgeAreas = LabSplitScreen.edgeAreas(this),
         )
+        // EXPERIMENT (lab): a 1920x1920 stream holding a 1920x1080 landscape and a 1080x1920 portrait area.
+        val display = if (LabSplitScreen.rotationAreas(this)) {
+            plainDisplay.copy(widthPixels = 1920, heightPixels = 1920, widthPhysicalMm = plainDisplay.widthPhysicalMm,
+                heightPhysicalMm = plainDisplay.widthPhysicalMm, viewArea = null, safeArea = null,
+                labSplitLeftPixels = null, labEdgeAreas = false, labStatusBarEdge = null, labRotationShortSide = 1080)
+        } else plainDisplay
         val requestSummary = "Display request selected=${CarPlayUiScale.label(requestedPercent)} percent=$requestedPercent " +
             "surface=${size.width}x${size.height} resolution=${requestedResolutionPercent}% " +
             "base=${requestedResolutionDisplay.widthPixels}x${requestedResolutionDisplay.heightPixels} " +

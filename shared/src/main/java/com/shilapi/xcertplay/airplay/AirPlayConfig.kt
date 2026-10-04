@@ -37,6 +37,11 @@ data class AirPlayDisplayConfig(
      * 1 = bottom), to move the dock live with updateViewArea instead of reconnecting.
      */
     val labEdgeAreas: Boolean = false,
+    /**
+     * EXPERIMENT (lab): a square stream with a landscape area (the top) and a portrait area (the left),
+     * to turn CarPlay with the screen by updateViewArea instead of reconnecting. Value = the short side.
+     */
+    val labRotationShortSide: Int? = null,
 )
 
 /** One OEM homescreen icon. */
