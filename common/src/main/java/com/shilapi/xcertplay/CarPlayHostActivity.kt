@@ -3464,10 +3464,16 @@ class CarPlayHostActivity : ComponentActivity() {
             val side = LabRotation.squareSide(long, hevcEnabled)
             val areaShort = (side.toLong() * shortSide / long).toInt() and 1.inv()
             appendLog("Lab rotation: square stream ${side}x$side, areas ${side}x$areaShort and ${areaShort}x$side")
-            plainDisplay.copy(widthPixels = side, heightPixels = side, widthPhysicalMm = plainDisplay.widthPhysicalMm,
-                heightPhysicalMm = plainDisplay.widthPhysicalMm, viewArea = null, safeArea = null,
+            // The square spans the screen's long side, whichever way DiPlay started, so the UI scale stays put.
+            val longMm = listOfNotNull(plainDisplay.widthPhysicalMm, plainDisplay.heightPhysicalMm).maxOrNull()
+            plainDisplay.copy(widthPixels = side, heightPixels = side, widthPhysicalMm = longMm,
+                heightPhysicalMm = longMm, viewArea = null, safeArea = null,
                 labSplitLeftPixels = null, labEdgeAreas = false, labStatusBarEdge = null, labRotationShortSide = areaShort,
                 labRotationInitialArea = if (size.width >= size.height) 0 else 1)
+        } else if (LabSplitScreen.halfArea(this) && size.width > size.height) {
+            // EXPERIMENT (lab): the left half of the canvas as a second area, for the head unit's split screen.
+            plainDisplay.copy(labHalfAreaPixels = (plainDisplay.widthPixels / 2) and 1.inv(), labSplitLeftPixels = null,
+                labEdgeAreas = false, labStatusBarEdge = null)
         } else plainDisplay
         val requestSummary = "Display request selected=${CarPlayUiScale.label(requestedPercent)} percent=$requestedPercent " +
             "surface=${size.width}x${size.height} resolution=${requestedResolutionPercent}% " +
@@ -3992,6 +3998,7 @@ class CarPlayHostActivity : ComponentActivity() {
             airPlayConfig.main.widthPixels, airPlayConfig.main.heightPixels,
             displayRotation(), hideTopBar, hideBottomBar, effectiveSize.width, effectiveSize.height,
             rotationShortSide = airPlayConfig.main.labRotationShortSide,
+            halfAreaWidth = airPlayConfig.main.labHalfAreaPixels,
         )
         sessionDisplay = display
         videoView?.let { updateVideoLayout(it.width, it.height) }
@@ -4092,6 +4099,17 @@ class CarPlayHostActivity : ComponentActivity() {
 
     private fun applyDisplaySize(size: DisplaySize) {
         val display = sessionDisplay
+        // EXPERIMENT (lab): the split-screen half area follows DiPlay's window without reconnecting.
+        if (display?.halfAreaWidth != null && controller != null && !menuOpen && !handshakeResetInProgress &&
+            !shuttingDown.get() && display.rotation == displayRotation()) {
+            val previous = activeDisplaySize
+            activeDisplaySize = size
+            val area = if (halfWindow(size.width, size.height, display)) 1 else 0
+            val sent = controller?.labViewArea(area, 300, listOf(1 - area))
+            videoView?.let { updateVideoLayout(it.width, it.height) }
+            appendLog("Lab split window ${previous?.width}x${previous?.height} -> ${size.width}x${size.height}: view area $area sent=$sent")
+            return
+        }
         // EXPERIMENT (lab): the square rotation stream turns CarPlay with a view area, not a reconnect.
         val running = controller
         if (display?.rotationShortSide != null && running != null && !menuOpen && !handshakeResetInProgress &&
@@ -4189,11 +4207,21 @@ class CarPlayHostActivity : ComponentActivity() {
         }, LabRotation.leadMillis(this))
     }
 
+    // A window much narrower than the session's canvas is the head unit's split screen.
+    private fun halfWindow(width: Int, height: Int, display: CarPlaySessionDisplay): Boolean =
+        height > 0 && width.toFloat() / height < display.width.toFloat() / display.height * 0.75f
+
     private fun contentRect(viewWidth: Int, viewHeight: Int): CarPlayVideoLayout {
         val display = sessionDisplay ?: return CarPlayVideoLayout(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
         // EXPERIMENT (lab): with the square rotation stream, the area for the view's orientation (landscape
         // at the top, portrait at the left) fills the view and the rest of the canvas falls outside it.
         // Video and touches both follow this rectangle.
+        // EXPERIMENT (lab): in a narrow window (the head unit's split screen) the half-width area fills it.
+        display.halfAreaWidth?.let { half ->
+            if (halfWindow(viewWidth, viewHeight, display)) {
+                return CarPlayVideoLayout(0f, 0f, display.width.toFloat() * viewWidth / half, viewHeight.toFloat())
+            }
+        }
         display.rotationShortSide?.let { short ->
             val viewLandscape = viewWidth >= viewHeight
             val landscape = rotationAreaAhead?.let { it == 0 } ?: viewLandscape
@@ -4799,6 +4827,8 @@ internal data class CarPlaySessionDisplay(
     val windowHeight: Int,
     /** EXPERIMENT (lab): a square stream turned by view areas; the short side of each area. */
     val rotationShortSide: Int? = null,
+    /** EXPERIMENT (lab): the width of the split-screen view area (the left part of the canvas). */
+    val halfAreaWidth: Int? = null,
 )
 
 /** Process-local hand-off for keeping the CarPlay session alive while no Activity is visible. */

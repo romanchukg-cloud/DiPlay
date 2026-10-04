@@ -42,6 +42,11 @@ data class AirPlayDisplayConfig(
      * to turn CarPlay with the screen by updateViewArea instead of reconnecting. Value = the short side.
      */
     val labRotationShortSide: Int? = null,
+    /**
+     * EXPERIMENT (lab): a second view area, the left part of this width, for the head unit's split screen
+     * (DiPlay's window then covers half the screen); the car switches to it without reconnecting.
+     */
+    val labHalfAreaPixels: Int? = null,
     /** EXPERIMENT (lab): the rotation area to start in (0 landscape, 1 portrait). */
     val labRotationInitialArea: Int = 0,
 )

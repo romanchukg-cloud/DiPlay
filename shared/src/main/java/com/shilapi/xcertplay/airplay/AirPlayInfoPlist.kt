@@ -182,7 +182,11 @@ object AirPlayInfoPlist {
             "primaryInputDevice" to display.primaryInputDevice,
         )
 
-        entry["viewAreas"] = if (display.labRotationShortSide != null) {
+        entry["viewAreas"] = if (display.labHalfAreaPixels != null) {
+            // EXPERIMENT (lab): the whole screen, and its left part as wide as a split-screen window.
+            val gap = display.widthPixels - display.labHalfAreaPixels
+            listOf(areaDict(display), areaDict(display.copy(viewArea = AirPlayInsets(right = gap), safeArea = AirPlayInsets(right = gap))))
+        } else if (display.labRotationShortSide != null) {
             // EXPERIMENT (lab): landscape (top) and portrait (left) inside one square stream.
             val gap = display.widthPixels - display.labRotationShortSide
             listOf(
@@ -204,7 +208,8 @@ object AirPlayInfoPlist {
         )
         entry["initialViewArea"] = if (display.labRotationShortSide != null) display.labRotationInitialArea else 0
         // EXPERIMENT (lab): the car switches view areas (key from Apple's CarPlaySDK strings).
-        if (display.labSplitLeftPixels != null || display.labEdgeAreas || display.labRotationShortSide != null) {
+        if (display.labSplitLeftPixels != null || display.labEdgeAreas || display.labRotationShortSide != null ||
+            display.labHalfAreaPixels != null) {
             entry["viewAreaTransitionControl"] = true
         }
         if (display.initialUrl != null) entry["initialURL"] = display.initialUrl
