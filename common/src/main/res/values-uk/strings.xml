@@ -618,6 +618,8 @@
     <string name="lab_probe_description">Записує в лог відповідь iPhone. Перепідключає CarPlay; якщо CarPlay більше не запускається, вимкніть.</string>
     <string name="lab_split_screen">Лабораторія: CarPlay на ⅔ екрана</string>
     <string name="lab_split_screen_description">Оголошує другу view area (праві ⅔ екрана). Перепідключає CarPlay; саме перемикання поки надсилається з Mac.</string>
+    <string name="lab_split_full">⤢ На весь екран</string>
+    <string name="lab_split_toggle">Лабораторія: бічна панель</string>
     <string name="lab_siri_microphone">Лаб: мікрофон Siri: %1$s</string>
     <string name="lab_siri_microphone_recognition">розпізнавання (стандарт)</string>
     <string name="lab_siri_microphone_gain">розпізнавання +12 дБ</string>

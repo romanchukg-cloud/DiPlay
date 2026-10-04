@@ -649,6 +649,8 @@
     <string name="lab_probe_description">Logs what the iPhone answers. Reconnects CarPlay; if CarPlay no longer starts, turn it off.</string>
     <string name="lab_split_screen">Lab: CarPlay on two thirds of the screen</string>
     <string name="lab_split_screen_description">Declares a second view area (the right two thirds). Reconnects CarPlay; the switch itself is sent from the Mac for now.</string>
+    <string name="lab_split_full">⤢ Full screen</string>
+    <string name="lab_split_toggle">Lab: side panel</string>
     <string name="lab_siri_microphone">Lab: Siri microphone: %1$s</string>
     <string name="lab_siri_microphone_recognition">recognition (default)</string>
     <string name="lab_siri_microphone_gain">recognition +12 dB</string>

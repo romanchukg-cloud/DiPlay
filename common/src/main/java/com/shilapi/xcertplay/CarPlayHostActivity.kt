@@ -419,6 +419,16 @@ class CarPlayHostActivity : ComponentActivity() {
     private var failurePendingAfterMenu: CarPlayStatus.Failed? = null
     private val shuttingDown = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
+    // EXPERIMENT (lab): DiPlay's own panel in the left third while CarPlay draws in its right-hand view area.
+    private var labSideContainer: View? = null
+    private var labPanelInfo: TextView? = null
+    private var labSplitActive = false
+    private val labPanelTick = object : Runnable {
+        override fun run() {
+            refreshLabPanel()
+            if (labSplitActive) mainHandler.postDelayed(this, LAB_PANEL_REFRESH_MILLIS)
+        }
+    }
     private val teardownExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val airPlayCommandExecutor: ExecutorService = Executors.newSingleThreadExecutor()
     private val logLines = ArrayDeque<LogEntry>()
@@ -1204,6 +1214,7 @@ class CarPlayHostActivity : ComponentActivity() {
         }
         root.addView(video, FrameLayout.LayoutParams(-1, -1))
         root.addView(gestureLayer, FrameLayout.LayoutParams(-1, -1))
+        labSideContainer = buildLabSidePanel().also { root.addView(it, FrameLayout.LayoutParams(-1, -1)) }
         // Measure the preparation content naturally, then fit it inside the safe viewport.
         val viewport = object : FrameLayout(this) {
             override fun onMeasure(widthMeasureSpec: Int, heightMeasureSpec: Int) {
@@ -1354,6 +1365,68 @@ class CarPlayHostActivity : ComponentActivity() {
         return root
     }
 
+    // EXPERIMENT (lab): the left third over the black part of the stream; the rest of the row is an
+    // unclickable spacer, so touches there still reach the gesture layer and CarPlay.
+    private fun buildLabSidePanel(): View {
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            weightSum = 3f
+            visibility = View.GONE
+        }
+        val panel = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            setBackgroundColor(Color.rgb(16, 16, 18))
+            setPadding(dp(24), dp(24), dp(24), dp(24))
+        }
+        panel.addView(android.widget.TextClock(this).apply {
+            format24Hour = "HH:mm"
+            format12Hour = "HH:mm"
+            textSize = 72f
+            setTextColor(Color.WHITE)
+            gravity = Gravity.CENTER
+        })
+        labPanelInfo = TextView(this).apply {
+            textSize = 30f
+            setTextColor(Color.rgb(200, 200, 205))
+            gravity = Gravity.CENTER
+            setPadding(0, dp(24), 0, dp(32))
+        }
+        panel.addView(labPanelInfo)
+        panel.addView(Button(this).apply {
+            text = getString(R.string.lab_split_full)
+            textSize = 22f
+            setOnClickListener { setLabSplit(false) }
+        })
+        container.addView(panel, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
+        container.addView(View(this), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 2f))
+        return container
+    }
+
+    private fun setLabSplit(on: Boolean) {
+        if (!LabSplitScreen.enabled(this)) {
+            android.widget.Toast.makeText(this, R.string.lab_split_screen, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        val sent = controller?.labViewArea(if (on) 1 else 0, LAB_SPLIT_ANIMATION_MILLIS, listOf(if (on) 0 else 1)) == true
+        appendLog("Lab split screen ${if (on) "on" else "off"} sent=$sent")
+        if (!sent) return
+        labSplitActive = on
+        labSideContainer?.visibility = if (on) View.VISIBLE else View.GONE
+        mainHandler.removeCallbacks(labPanelTick)
+        if (on) labPanelTick.run()
+    }
+
+    private fun refreshLabPanel() {
+        val extras = com.shilapi.xcertplay.hud.BydNavigationOutputs.labVehicleExtras(this).snapshot()
+        val battery = com.shilapi.xcertplay.hud.BydNavigationOutputs.batteryStatus(this).snapshot()
+        labPanelInfo?.text = listOfNotNull(
+            extras?.outsideC?.let { "🌡 $it °C" },
+            battery?.let { "🔋 ${Math.round(it.batteryPercent)} %  ·  ${it.rangeKm} km" },
+        ).joinToString("\n").ifEmpty { "—" }
+    }
+
     private fun buildSettingsMenu(): View {
         val overlay = FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
@@ -1376,6 +1449,15 @@ class CarPlayHostActivity : ComponentActivity() {
                 ViewGroup.LayoutParams.WRAP_CONTENT,
             ),
         )
+        // EXPERIMENT (lab): CarPlay on the right two thirds with DiPlay's panel on the left.
+        content.addView(Button(this).apply {
+            text = getString(R.string.lab_split_toggle)
+            textSize = 20f
+            setOnClickListener {
+                cancelSettingsEdits()
+                setLabSplit(!labSplitActive)
+            }
+        }, LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT))
         content.addView(
             settingsCategoryHeader(getString(R.string.connection)),
             LinearLayout.LayoutParams(
@@ -3862,6 +3944,10 @@ class CarPlayHostActivity : ComponentActivity() {
         updateClusterMapShown()
         CarPlayMediaKeys.attach(this, next)
         if (airPlayConfig.videoInCar) CarPlayVideo.attach(this, next)
+        // EXPERIMENT (lab): a new session starts in the whole-screen view area.
+        labSplitActive = false
+        labSideContainer?.visibility = View.GONE
+        mainHandler.removeCallbacks(labPanelTick)
         // BYD's phone screen opens on the same wheel press: bring CarPlay back once it is up.
         next.callKeyListener = {
             for (delay in CALL_KEY_RETURN_MILLIS) {
@@ -4574,6 +4660,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private companion object {
+        private const val LAB_SPLIT_ANIMATION_MILLIS = 300
+        private const val LAB_PANEL_REFRESH_MILLIS = 5_000L
         const val TAG = "xcertplay-usb"
         const val SCREEN_TYPE_MAIN = 110
         const val SCREEN_TYPE_ALT = 111
