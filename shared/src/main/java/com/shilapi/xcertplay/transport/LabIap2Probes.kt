@@ -77,4 +77,78 @@ object LabIap2Probes {
     )
 
     fun describe(frame: Iap2Frame): String = "LAB-PROBE " + Iap2FrameFormatter.format(Iap2TraceDirection.RX, "probe", frame)
+
+    /** The car's readings for [VEHICLE_EXTRAS]; set by the host while that probe is on. */
+    @Volatile var extrasSource: LabVehicleExtrasSource? = null
+
+    /**
+     * VehicleStatusUpdate (0xA101) with what the iPhone asked for and the car can tell: OutsideTemperature
+     * (int16, °C), WiperStatus {WasherOn, WipeDuration msecs16, WaitDuration msecs32} and Alerts (a list:
+     * 0 traction loss, 1 ABS, 3 hazard). No BarometricPressure source; PassengerSeatStatus not yet known.
+     */
+    fun extrasUpdate(extras: LabVehicleExtras): Iap2Frame = Iap2Messages.buildRaw(Iap2VehicleStatus.VEHICLE_STATUS_UPDATE) {
+        extras.outsideC?.let { i16(4, it) }
+        extras.wipersOn?.let { on ->
+            group(17) {
+                bool(0, false) // WasherOn
+                u16(1, if (on) WIPE_MILLIS else 0) // WipeDuration
+                u32(2, 0) // WaitDuration: continuous
+            }
+        }
+        if (extras.tractionLoss) u8(19, 0)
+        if (extras.abs) u8(19, 1)
+        if (extras.hazard) u8(19, 3)
+    }
+
+    private const val WIPE_MILLIS = 1_000
+}
+
+/** What [LabIap2Probes.VEHICLE_EXTRAS] reports; null fields are unknown. */
+data class LabVehicleExtras(
+    val outsideC: Int?,
+    val wipersOn: Boolean?,
+    val hazard: Boolean,
+    val abs: Boolean,
+    val tractionLoss: Boolean,
+)
+
+fun interface LabVehicleExtrasSource {
+    fun snapshot(): LabVehicleExtras?
+}
+
+/** EXPERIMENT (lab): answers the iPhone's subscription with [LabVehicleExtras] at once on a change. */
+internal class LabVehicleExtrasReporter(
+    private val source: LabVehicleExtrasSource?,
+    private val onProgress: (String) -> Unit,
+    private val nanoTime: () -> Long = System::nanoTime,
+) {
+    private var active = false
+    private var last: LabVehicleExtras? = null
+    private var lastSentNanos = 0L
+
+    fun handle(frame: Iap2Frame) {
+        when (frame.messageId) {
+            Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES -> {
+                active = source != null
+                last = null
+            }
+            Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES -> active = false
+        }
+    }
+
+    fun tick(send: (Iap2Frame) -> Unit) {
+        if (!active) return
+        val extras = source?.snapshot() ?: return
+        if (extras == last && nanoTime() - lastSentNanos < RESEND_NANOS) return
+        send(LabIap2Probes.extrasUpdate(extras))
+        if (extras != last) onProgress("iap2 tx=0xa101 lab vehicle extras $extras")
+        last = extras
+        lastSentNanos = nanoTime()
+    }
+
+    fun pollTimeout(remainingMillis: Long): Long = if (active) minOf(remainingMillis, 1_000L) else remainingMillis
+
+    private companion object {
+        const val RESEND_NANOS = 30_000_000_000L
+    }
 }

@@ -76,6 +76,9 @@ class Iap2WirelessControlClient(
         var wirelessCarPlayAvailableSeen = false
         val location = Iap2LocationReporter(locationProvider, onProgress)
         val vehicleStatus = Iap2VehicleStatusReporter(vehicleStatusProvider, onProgress)
+        val labExtras = LabVehicleExtrasReporter(
+            LabIap2Probes.extrasSource.takeIf { LabIap2Probes.VEHICLE_EXTRAS in identification.labProbes }, onProgress,
+        )
         try {
             while (true) {
                 val remaining = remainingMillis(deadlineNanos)
@@ -93,7 +96,8 @@ class Iap2WirelessControlClient(
                 }
                 location.tick { send(it, deadlineNanos) }
                 vehicleStatus.tick { send(it, deadlineNanos) }
-                val pollTimeout = vehicleStatus.pollTimeout(location.pollTimeout(remaining))
+                labExtras.tick { send(it, deadlineNanos) }
+                val pollTimeout = labExtras.pollTimeout(vehicleStatus.pollTimeout(location.pollTimeout(remaining)))
                 val incoming = session.recv(pollTimeout)
                 if (incoming == null) {
                     if (session.isClosed) {
@@ -211,6 +215,7 @@ class Iap2WirelessControlClient(
 
                     Iap2VehicleStatus.START_VEHICLE_STATUS_UPDATES, Iap2VehicleStatus.STOP_VEHICLE_STATUS_UPDATES -> {
                         if (identification.labProbes.isNotEmpty()) onProgress(LabIap2Probes.describe(incoming))
+                        labExtras.handle(incoming)
                         vehicleStatus.handle(incoming) { send(it, deadlineNanos) }
                     }
 
