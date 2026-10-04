@@ -22,6 +22,11 @@ data class AirPlayDisplayConfig(
     val initialUrl: String? = null,
     /** Display feature bits; null keeps the main-screen default (high-fidelity touch and knobs). */
     val features: Int? = null,
+    /**
+     * EXPERIMENT (lab): a second view area, the part of the stream right of this x, as Apple's widescreen
+     * profile declares (full 1920x720 plus the right 1280x720). The car switches with updateViewArea.
+     */
+    val labSplitLeftPixels: Int? = null,
 )
 
 /** One OEM homescreen icon. */

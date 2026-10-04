@@ -585,6 +585,12 @@ class DiPlayActivity : ComponentActivity() {
                 siriMic.text = siriMicrophoneLabel(SiriMicrophone.cycle(this))
             }
             card.addView(siriMic, matchButton(10, 56))
+            // EXPERIMENT (lab): a second view area for CarPlay on the right two thirds; applies on reconnect.
+            toggle(card, getString(R.string.lab_split_screen), getString(R.string.lab_split_screen_description),
+                LabSplitScreen.enabled(this)) {
+                LabSplitScreen.setEnabled(this, it)
+                reconnectForClusterMap()
+            }
             // EXPERIMENT (lab): what more the iPhone takes from a car; each applies on reconnect.
             for ((probe, title) in listOf(
                 com.shilapi.xcertplay.transport.LabIap2Probes.VEHICLE_EXTRAS to R.string.lab_probe_vehicle_extras,

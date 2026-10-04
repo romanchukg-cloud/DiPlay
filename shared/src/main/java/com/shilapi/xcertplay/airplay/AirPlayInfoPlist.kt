@@ -182,7 +182,17 @@ object AirPlayInfoPlist {
             "primaryInputDevice" to display.primaryInputDevice,
         )
 
-        entry["viewAreas"] = listOf(areaDict(display))
+        entry["viewAreas"] = listOfNotNull(
+            areaDict(display),
+            // EXPERIMENT (lab): the right-hand part, for a panel of the car's own on the left.
+            display.labSplitLeftPixels?.let { left ->
+                val safe = display.safeArea ?: AirPlayInsets()
+                areaDict(display.copy(
+                    viewArea = AirPlayInsets(left = left),
+                    safeArea = safe.copy(left = maxOf(left, safe.left)),
+                ))
+            },
+        )
         entry["initialViewArea"] = 0
         if (display.initialUrl != null) entry["initialURL"] = display.initialUrl
         return entry
