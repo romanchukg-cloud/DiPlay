@@ -182,7 +182,9 @@ object AirPlayInfoPlist {
             "primaryInputDevice" to display.primaryInputDevice,
         )
 
-        entry["viewAreas"] = listOfNotNull(
+        entry["viewAreas"] = if (display.labEdgeAreas) {
+            listOf(areaDict(display.copy(labStatusBarEdge = 2)), areaDict(display.copy(labStatusBarEdge = 1)))
+        } else listOfNotNull(
             areaDict(display),
             // EXPERIMENT (lab): the right-hand part, for a panel of the car's own on the left.
             display.labSplitLeftPixels?.let { left ->
@@ -195,7 +197,7 @@ object AirPlayInfoPlist {
         )
         entry["initialViewArea"] = 0
         // EXPERIMENT (lab): the car switches view areas (key from Apple's CarPlaySDK strings).
-        if (display.labSplitLeftPixels != null) entry["viewAreaTransitionControl"] = true
+        if (display.labSplitLeftPixels != null || display.labEdgeAreas) entry["viewAreaTransitionControl"] = true
         if (display.initialUrl != null) entry["initialURL"] = display.initialUrl
         return entry
     }

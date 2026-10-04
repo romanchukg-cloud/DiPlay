@@ -3438,6 +3438,7 @@ class CarPlayHostActivity : ComponentActivity() {
             safeAreaDrawOutside = safeAreaDrawOutside,
             labSplitLeftPixels = if (LabSplitScreen.enabled(this)) LabSplitScreen.leftPixels(scaledDisplay.widthPixels) else null,
             labStatusBarEdge = LabSplitScreen.statusBarEdge(this),
+            labEdgeAreas = LabSplitScreen.edgeAreas(this),
         )
         val requestSummary = "Display request selected=${CarPlayUiScale.label(requestedPercent)} percent=$requestedPercent " +
             "surface=${size.width}x${size.height} resolution=${requestedResolutionPercent}% " +

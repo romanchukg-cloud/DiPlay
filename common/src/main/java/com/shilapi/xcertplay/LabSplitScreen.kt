@@ -28,6 +28,9 @@ object LabSplitScreen {
     fun setStatusBarEdge(context: Context, edge: Int?) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt("status_bar_edge", edge ?: -1).apply()
 
+    fun edgeAreas(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("edge_areas", false)
+
     /** Where the right-hand area starts: a third of the stream, kept even for the encoder. */
     fun leftPixels(widthPixels: Int): Int = (widthPixels / 3) and 1.inv()
 }

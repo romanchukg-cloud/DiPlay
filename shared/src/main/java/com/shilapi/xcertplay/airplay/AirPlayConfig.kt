@@ -32,6 +32,11 @@ data class AirPlayDisplayConfig(
      * Simulator's StatusBarEdge has automatic, bottom and driver; the numbers are being tried.
      */
     val labStatusBarEdge: Int? = null,
+    /**
+     * EXPERIMENT (lab): two whole-screen view areas that differ only in their dock edge (0 = driver side,
+     * 1 = bottom), to move the dock live with updateViewArea instead of reconnecting.
+     */
+    val labEdgeAreas: Boolean = false,
 )
 
 /** One OEM homescreen icon. */
