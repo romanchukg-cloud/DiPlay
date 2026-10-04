@@ -135,7 +135,11 @@ class WheelKeyService : AccessibilityService() {
             },
         )
         when (action) {
-            WheelZoomKeys.Action.PASS -> return false
+            WheelZoomKeys.Action.PASS -> {
+                // EXPERIMENT (lab): BYD's custom key turns the screen; let a rotating CarPlay start early.
+                if (down && event.repeatCount == 0 && event.keyCode == LabRotation.ROTATE_KEY) LabRotation.onRotateKey?.invoke()
+                return false
+            }
             WheelZoomKeys.Action.CONSUME -> Unit
             WheelZoomKeys.Action.MODE_ON -> announce(zoomOn = true)
             WheelZoomKeys.Action.MODE_OFF -> announce(zoomOn = false)

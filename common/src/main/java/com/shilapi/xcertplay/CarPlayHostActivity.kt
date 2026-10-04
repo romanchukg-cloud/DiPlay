@@ -419,6 +419,17 @@ class CarPlayHostActivity : ComponentActivity() {
     private var failurePendingAfterMenu: CarPlayStatus.Failed? = null
     private val shuttingDown = AtomicBoolean(false)
     private val mainHandler = Handler(Looper.getMainLooper())
+    // EXPERIMENT (lab): the rotation area CarPlay was asked to use ahead of Android's own rotation.
+    private var rotationAreaAhead: Int? = null
+    private val rotationAheadTimeout = Runnable {
+        val ahead = rotationAreaAhead ?: return@Runnable
+        rotationAreaAhead = null
+        val view = videoView ?: return@Runnable
+        val area = if (view.width >= view.height) 0 else 1
+        if (area != ahead) controller?.labViewArea(area, 300, listOf(1 - area))
+        updateVideoLayout(view.width, view.height)
+        appendLog("Lab rotation: the screen did not turn; back to view area $area")
+    }
     // EXPERIMENT (lab): DiPlay's own panel in the left third while CarPlay draws in its right-hand view area.
     private var labSideContainer: View? = null
     private var labPanelInfo: TextView? = null
@@ -524,6 +535,8 @@ class CarPlayHostActivity : ComponentActivity() {
         loadPersistedSettings()
         locationPermissionAvailable = hasFineLocationPermission()
         setContentView(buildContentView())
+        // EXPERIMENT (lab): start a rotating CarPlay's turn while the screen is still moving.
+        LabRotation.onRotateKey = { mainHandler.post { rotateAhead() } }
         applyFullscreenMode()
         onBackPressedDispatcher.addCallback(
             this,
@@ -1166,6 +1179,8 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        if (LabRotation.onRotateKey != null) LabRotation.onRotateKey = null
+        mainHandler.removeCallbacks(rotationAheadTimeout)
         nightModeController.pause()
         pictureBinding?.close()
         pictureBinding = null
@@ -4066,7 +4081,8 @@ class CarPlayHostActivity : ComponentActivity() {
             return
         }
         pendingDisplaySize = size
-        mainHandler.postDelayed(applyDisplaySize, DISPLAY_CHANGE_DEBOUNCE_MILLIS)
+        // EXPERIMENT (lab): a rotating CarPlay needs no reconnect, so it does not wait for the size to settle.
+        mainHandler.postDelayed(applyDisplaySize, if (sessionDisplay?.rotationShortSide != null) 0L else DISPLAY_CHANGE_DEBOUNCE_MILLIS)
     }
 
     private fun isMultiWindowActive(): Boolean {
@@ -4084,7 +4100,10 @@ class CarPlayHostActivity : ComponentActivity() {
             activeDisplaySize = size
             sessionDisplay = display.copy(rotation = displayRotation())
             val area = if (size.width >= size.height) 0 else 1
-            val sent = running.labViewArea(area, 300, listOf(1 - area))
+            val ahead = rotationAreaAhead
+            rotationAreaAhead = null
+            mainHandler.removeCallbacks(rotationAheadTimeout)
+            val sent = if (ahead == area) "ahead" else running.labViewArea(area, 300, listOf(1 - area)).toString()
             videoView?.let { updateVideoLayout(it.width, it.height) }
             appendLog("Rotation ${previous?.width}x${previous?.height} -> ${size.width}x${size.height}: view area $area sent=$sent, no reconnect")
             return
@@ -4150,15 +4169,42 @@ class CarPlayHostActivity : ComponentActivity() {
 
 
 
+    // EXPERIMENT (lab): the custom key started the screen's turn; after the lead time ask the iPhone for
+    // the other orientation, so its picture is ready when Android turns the view about 3 s after the key.
+    private fun rotateAhead() {
+        val display = sessionDisplay ?: return
+        if (display.rotationShortSide == null || controller == null || rotationAreaAhead != null) return
+        val view = videoView ?: return
+        val target = if (view.width >= view.height) 1 else 0
+        mainHandler.postDelayed({
+            val running = controller ?: return@postDelayed
+            if (sessionDisplay?.rotationShortSide == null) return@postDelayed
+            val now = videoView ?: return@postDelayed
+            if ((if (now.width >= now.height) 0 else 1) == target) return@postDelayed // already turned
+            rotationAreaAhead = target
+            val sent = running.labViewArea(target, 300, listOf(1 - target))
+            updateVideoLayout(now.width, now.height)
+            mainHandler.postDelayed(rotationAheadTimeout, ROTATION_AHEAD_TIMEOUT_MILLIS)
+            appendLog("Lab rotation ahead: view area $target sent=$sent")
+        }, LabRotation.leadMillis(this))
+    }
+
     private fun contentRect(viewWidth: Int, viewHeight: Int): CarPlayVideoLayout {
         val display = sessionDisplay ?: return CarPlayVideoLayout(0f, 0f, viewWidth.toFloat(), viewHeight.toFloat())
         // EXPERIMENT (lab): with the square rotation stream, the area for the view's orientation (landscape
         // at the top, portrait at the left) fills the view and the rest of the canvas falls outside it.
         // Video and touches both follow this rectangle.
         display.rotationShortSide?.let { short ->
-            val landscape = viewWidth >= viewHeight
+            val viewLandscape = viewWidth >= viewHeight
+            val landscape = rotationAreaAhead?.let { it == 0 } ?: viewLandscape
             val areaWidth = if (landscape) display.width else short
             val areaHeight = if (landscape) short else display.height
+            if (landscape != viewLandscape) {
+                // Ahead of Android's rotation: show the new area whole, centred, until the view turns.
+                val scale = minOf(viewWidth.toFloat() / areaWidth, viewHeight.toFloat() / areaHeight)
+                return CarPlayVideoLayout((viewWidth - areaWidth * scale) / 2f, (viewHeight - areaHeight * scale) / 2f,
+                    display.width * scale, display.height * scale)
+            }
             return CarPlayVideoLayout(0f, 0f,
                 display.width.toFloat() * viewWidth / areaWidth, display.height.toFloat() * viewHeight / areaHeight)
         }
@@ -4700,6 +4746,7 @@ class CarPlayHostActivity : ComponentActivity() {
     }
 
     private companion object {
+        const val ROTATION_AHEAD_TIMEOUT_MILLIS = 6_000L
         private const val LAB_SPLIT_ANIMATION_MILLIS = 300
         private const val LAB_PANEL_REFRESH_MILLIS = 5_000L
         const val TAG = "xcertplay-usb"
