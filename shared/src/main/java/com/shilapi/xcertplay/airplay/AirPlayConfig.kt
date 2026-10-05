@@ -59,8 +59,8 @@ data class AirPlayDisplayConfig(
     val labInitialArea: Int = 0,
 )
 
-/** EXPERIMENT (lab): a view area's size; it starts at the canvas's top-left corner. */
-data class AirPlayAreaSize(val width: Int, val height: Int)
+/** EXPERIMENT (lab): a view area's size; it starts at the canvas's top edge, [originX] from the left. */
+data class AirPlayAreaSize(val width: Int, val height: Int, val originX: Int = 0)
 
 /** One OEM homescreen icon. */
 data class AirPlayIcon(

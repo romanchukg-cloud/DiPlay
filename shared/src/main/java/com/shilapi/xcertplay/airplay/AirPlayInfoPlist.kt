@@ -184,7 +184,8 @@ object AirPlayInfoPlist {
 
         entry["viewAreas"] = if (display.labAreas != null) {
             display.labAreas.map { area ->
-                val insets = AirPlayInsets(right = display.widthPixels - area.width, bottom = display.heightPixels - area.height)
+                val insets = AirPlayInsets(left = area.originX, right = display.widthPixels - area.originX - area.width,
+                    bottom = display.heightPixels - area.height)
                 areaDict(display.copy(viewArea = insets, safeArea = insets))
             }
         } else if (display.labHalfAreaPixels != null) {

@@ -7,8 +7,10 @@ import kotlin.math.ln
 /** EXPERIMENT (lab): which declared view area suits a window. */
 object LabAreas {
     /** What a declared area is for. */
-    enum class Kind(val portrait: Boolean, val split: Boolean) {
-        LANDSCAPE(false, false), PORTRAIT(true, false), LANDSCAPE_SPLIT(false, true), PORTRAIT_SPLIT(true, true)
+    enum class Kind(val portrait: Boolean, val split: Boolean, val manual: Boolean = false) {
+        LANDSCAPE(false, false), PORTRAIT(true, false), LANDSCAPE_SPLIT(false, true), PORTRAIT_SPLIT(true, true),
+        /** The right two thirds beside DiPlay's side panel; only the panel's button picks it. */
+        SIDE_PANEL(false, false, manual = true),
     }
 
     /** A window more than this far (as an aspect ratio) from every area needs a reconnect instead. */
@@ -23,8 +25,9 @@ object LabAreas {
      * any, otherwise among all; null when none has about the window's shape.
      */
     fun pick(areas: List<AirPlayAreaSize>, kinds: List<Kind>?, width: Int, height: Int, portrait: Boolean, split: Boolean): Int? {
-        val matching = kinds?.indices?.filter { kinds[it].portrait == portrait && kinds[it].split == split }.orEmpty()
-        return closestOf(areas, matching, width, height) ?: closest(areas, width, height)
+        val automatic = areas.indices.filter { kinds?.getOrNull(it)?.manual != true }
+        val matching = automatic.filter { kinds?.getOrNull(it)?.let { k -> k.portrait == portrait && k.split == split } == true }
+        return closestOf(areas, matching, width, height) ?: closestOf(areas, automatic, width, height)
     }
 
     private fun closestOf(areas: List<AirPlayAreaSize>, candidates: List<Int>, width: Int, height: Int): Int? {

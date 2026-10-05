@@ -1427,7 +1427,22 @@ class CarPlayHostActivity : ComponentActivity() {
             android.widget.Toast.makeText(this, R.string.lab_split_screen, android.widget.Toast.LENGTH_SHORT).show()
             return
         }
-        val sent = controller?.labViewArea(if (on) 1 else 0, LAB_SPLIT_ANIMATION_MILLIS, listOf(if (on) 0 else 1)) == true
+        val display = sessionDisplay
+        val kinds = labAreaKinds
+        val areas = display?.areas
+        val sent = if (areas != null && kinds != null) {
+            val side = kinds.indexOf(LabAreas.Kind.SIDE_PANEL)
+            val view = videoView
+            val target = if (on) side else view?.let {
+                LabAreas.pick(areas, kinds, it.width, it.height, screenPortrait(), isMultiWindowActive())
+            } ?: 0
+            if (target < 0) false else {
+                sessionDisplay = display.copy(area = target)
+                controller?.labViewArea(target, LAB_SPLIT_ANIMATION_MILLIS, areas.indices.filter { it != target }) == true
+            }
+        } else {
+            controller?.labViewArea(if (on) 1 else 0, LAB_SPLIT_ANIMATION_MILLIS, listOf(if (on) 0 else 1)) == true
+        }
         appendLog("Lab split screen ${if (on) "on" else "off"} sent=$sent")
         if (!sent) return
         labSplitActive = on
@@ -3463,13 +3478,13 @@ class CarPlayHostActivity : ComponentActivity() {
         // split screen (an area the size of the split window) in one session, picked by the window's shape.
         val rotationAreas = LabSplitScreen.rotationAreas(this)
         val splitArea = LabSplitScreen.halfArea(this)
-        val display = if (rotationAreas || (splitArea && size.width > size.height)) {
+        val display = if (rotationAreas || ((splitArea || LabSplitScreen.enabled(this)) && size.width > size.height)) {
             val long = maxOf(size.width, size.height)
             val shortSide = minOf(size.width, size.height)
             val areas = mutableListOf<com.shilapi.xcertplay.airplay.AirPlayAreaSize>()
             val kinds = mutableListOf<LabAreas.Kind>()
-            fun add(kind: LabAreas.Kind, width: Int, height: Int) {
-                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(width and 1.inv(), height and 1.inv())
+            fun add(kind: LabAreas.Kind, width: Int, height: Int, originX: Int = 0) {
+                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(width and 1.inv(), height and 1.inv(), originX and 1.inv())
                 kinds += kind
             }
             val canvas = if (rotationAreas) {
@@ -3494,6 +3509,12 @@ class CarPlayHostActivity : ComponentActivity() {
                     val port = LabSplitScreen.splitWindowFraction(this, portrait = true) ?: (1f to 0.5f)
                     add(LabAreas.Kind.PORTRAIT_SPLIT, (portraitArea.width * port.first).toInt(), (portraitArea.height * port.second).toInt())
                 }
+            }
+            if (LabSplitScreen.enabled(this)) {
+                // DiPlay's side panel: CarPlay on the right two thirds of the landscape screen.
+                val landscape = areas[0]
+                val left = landscape.width / 3
+                add(LabAreas.Kind.SIDE_PANEL, landscape.width - (left and 1.inv()), landscape.height, left)
             }
             val initial = LabAreas.pick(areas, kinds, size.width, size.height, screenPortrait(), isMultiWindowActive()) ?: 0
             labAreaKinds = kinds
@@ -4145,6 +4166,11 @@ class CarPlayHostActivity : ComponentActivity() {
             val ahead = rotationAreaAhead
             rotationAreaAhead = null
             mainHandler.removeCallbacks(rotationAheadTimeout)
+            if (labSplitActive) {
+                labSplitActive = false
+                labSideContainer?.visibility = View.GONE
+                mainHandler.removeCallbacks(labPanelTick)
+            }
             sessionDisplay = display.copy(rotation = displayRotation(), area = areaFor)
             val sent = if (areaFor == display.area || areaFor == ahead) "kept" else
                 controller?.labViewArea(areaFor, 300, areas.indices.filter { it != areaFor }).toString()
@@ -4294,7 +4320,9 @@ class CarPlayHostActivity : ComponentActivity() {
         // EXPERIMENT (lab): the area in use fills the view; ahead of Android's rotation the new area shows
         // whole and centred until the view turns. Video and touches both follow this rectangle.
         display.areas?.let { areas ->
-            val index = (rotationAreaAhead ?: display.area).coerceIn(0, areas.lastIndex)
+            var index = (rotationAreaAhead ?: display.area).coerceIn(0, areas.lastIndex)
+            // Beside the side panel CarPlay draws in part of the landscape area; lay out that whole area.
+            if (labAreaKinds?.getOrNull(index) == LabAreas.Kind.SIDE_PANEL) index = labAreaKinds?.indexOf(LabAreas.Kind.LANDSCAPE) ?: 0
             val area = areas[index]
             val viewArea = LabAreas.pick(areas, labAreaKinds, viewWidth, viewHeight, screenPortrait(), isMultiWindowActive())
             if (rotationAreaAhead != null && viewArea != index) {
