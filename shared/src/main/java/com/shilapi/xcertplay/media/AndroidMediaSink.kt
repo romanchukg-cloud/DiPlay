@@ -291,7 +291,12 @@ class AndroidMediaSink(
     override fun onMicrophoneStarted(id: AudioStreamId, config: MicrophoneConfig) {
         // This callback runs on the downlink thread; microphone failures must not stop playback.
         try {
-            if (config.audioType == "telephony") enterCommunicationMode(id)
+            // EXPERIMENT (lab): Siri on the call capture path also takes the call's audio mode, so the echo
+            // canceller has its reference and the head unit treats Siri's voice like a call.
+            if (config.audioType == "telephony" ||
+                (config.audioType == "speechrecognition" && SiriMicrophone.mode == SiriMicrophone.Mode.CALL)) {
+                enterCommunicationMode(id)
+            }
             val uplink = microphoneUplinks.computeIfAbsent(id) { MicrophoneUplink(config, onAudioDiagnostic) }
             if (!uplink.start()) {
                 microphoneUplinks.remove(id, uplink)
@@ -321,6 +326,7 @@ class AndroidMediaSink(
             manager.mode = AudioManager.MODE_IN_COMMUNICATION
             communicationModeStream = id
             Log.i("xcertplay-usb", "audio mode $savedAudioMode -> ${manager.mode} for telephony stream=$id")
+            runCatching { onAudioDiagnostic("Audio: mode $savedAudioMode -> ${manager.mode} for stream=$id") } // lab
         }
     }
 
