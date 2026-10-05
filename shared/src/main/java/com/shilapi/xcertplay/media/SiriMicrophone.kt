@@ -1,6 +1,12 @@
 package com.shilapi.xcertplay.media
 
 import android.content.Context
+import java.io.File
+import java.io.FileOutputStream
+import java.io.OutputStream
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /**
  * EXPERIMENT (lab): which capture path feeds Siri. On a DiLink 5.0 Tang the voice-recognition input
@@ -29,7 +35,24 @@ object SiriMicrophone {
     @Volatile var mode = Mode.RECOGNITION
         private set
 
+    /** EXPERIMENT (lab): where the last microphone streams are kept as raw PCM, to hear what Siri gets. */
+    @Volatile private var recordDir: File? = null
+    private const val RECORDINGS_KEPT = 6
+
+    /**
+     * A new raw 16-bit PCM file for a [audioType] stream at [sampleRate] in the app's private files
+     * (mic-lab), keeping only the latest few; null when it cannot be opened.
+     */
+    fun openRecording(audioType: String, sampleRate: Int, channels: Int): OutputStream? = runCatching {
+        val dir = recordDir ?: return null
+        dir.listFiles { file -> file.name.endsWith(".pcm") }?.sortedByDescending { it.lastModified() }
+            ?.drop(RECORDINGS_KEPT - 1)?.forEach { it.delete() }
+        val stamp = SimpleDateFormat("HHmmss", Locale.US).format(Date())
+        FileOutputStream(File(dir, "mic-$audioType-${sampleRate}hz-${channels}ch-$stamp.pcm")).buffered()
+    }.getOrNull()
+
     fun load(context: Context): Mode {
+        recordDir = File(context.filesDir, "mic-lab").apply { mkdirs() }
         val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
         mode = Mode.entries.firstOrNull { it.name == stored } ?: Mode.RECOGNITION
         return mode

@@ -40,6 +40,10 @@ internal class MicrophoneUplink(
     /** EXPERIMENT (lab): the Siri capture path chosen in the settings, fixed for this stream. */
     private val siriMode = if (config.audioType == "speechrecognition") SiriMicrophone.mode else null
     private val level = SiriLevel()
+    /** EXPERIMENT (lab): what this stream sends, as raw PCM, for Siri and calls. */
+    private val recording = if (siriMode != null || config.audioType == "telephony") {
+        SiriMicrophone.openRecording(config.audioType, config.sampleRate, config.channels)
+    } else null
     private var thread: Thread? = null
 
     fun start(): Boolean {
@@ -233,6 +237,7 @@ internal class MicrophoneUplink(
             }
         } finally {
             stats.flush(ended = true, routeType = routeInfo)
+            runCatching { recording?.close() }
             running.set(false)
             release()
         }
@@ -244,7 +249,9 @@ internal class MicrophoneUplink(
             val gain = if (siriMode == SiriMicrophone.Mode.RECOGNITION_GAIN || siriMode == SiriMicrophone.Mode.CALL_GAIN) {
                 SiriMicrophone.GAIN
             } else 1
-            level.measure(frame, gain)?.let { report ->
+            val report = level.measure(frame, gain)
+            runCatching { recording?.write(frame) }
+            report?.let { report ->
                 val line = "Microphone: level ${config.audioType} mode=${siriMode ?: "call"} $report"
                 Log.i(TAG, line)
                 runCatching { onDiagnostic(line) }
@@ -291,6 +298,7 @@ internal class MicrophoneUplink(
     private fun routeType(recorder: AudioRecord): Int? = runCatching { recorder.routedDevice?.type }.getOrNull()
 
     override fun close() {
+        runCatching { recording?.close() } // lab; also when the capture never started
         if (!running.compareAndSet(true, false)) {
             release()
             return
