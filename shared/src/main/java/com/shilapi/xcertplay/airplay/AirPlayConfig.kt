@@ -86,4 +86,6 @@ data class AirPlayConfig(
     /** EXPERIMENT (lab): offer CarPlay's main buffered audio and log what the iPhone does with it. */
     val labMainBuffered: Int = 0,
     val labMainBufferedInfo: Int = 0,
+    val labMainBufferedType: Int = 103,
+    val labMainBufferedFormat: Long = 0x800000L,
 )

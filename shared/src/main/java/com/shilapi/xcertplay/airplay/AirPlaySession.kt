@@ -709,7 +709,7 @@ class AirPlaySession(
                         result.add(streamResponse)
                     }
                 }
-                LabBufferedAudioProbe.STREAM_TYPE -> if (config.labMainBuffered != 0) {
+                in LabBufferedAudioProbe.CANDIDATE_TYPES -> if (config.labMainBuffered != 0) {
                     // EXPERIMENT (lab): accept the buffered music connection and log it.
                     labBufferedProbe?.close()
                     val probe = LabBufferedAudioProbe { debugLog(it) }.also { labBufferedProbe = it }
@@ -775,7 +775,7 @@ class AirPlaySession(
             activeStreams.clear()
         } else {
             types.forEach { type -> if (activeStreams.remove(type)) media.onTeardown(this, type) }
-            if (types.contains(LabBufferedAudioProbe.STREAM_TYPE)) labBufferedProbe?.close() // lab
+            if (types.any { it in LabBufferedAudioProbe.CANDIDATE_TYPES }) labBufferedProbe?.close() // lab
         }
         if (STREAM_TYPE_ALT_SCREEN !in activeStreams) clearClusterContent()
         return RtspMessage.Response(status = 200)

@@ -75,14 +75,32 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
         const val MODE_SESSION = 8
         private const val KEY_INFO = "lab_main_buffered_info"
 
-        /** What mainBufferedInfo holds: 0 nothing, 1 bufferSizeMs, 2 audioBufferSize, 3 both. */
+        private const val KEY_TYPE = "lab_main_buffered_type"
+        private const val KEY_FORMAT = "lab_main_buffered_format"
+
+        /** What mainBufferedInfo holds: bits 1 bufferSizeMs, 2 audioBufferSize, 4 its own audioFormats entry. */
         fun infoVariant(context: Context): Int =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_INFO, 0)
 
-        fun info(variant: Int): Map<String, Any?> = linkedMapOf<String, Any?>().apply {
+        /** The stream type tried for buffered audio (103 as in AirPlay 2; 104/105 are the other free numbers). */
+        fun streamType(context: Context): Int =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_TYPE, STREAM_TYPE)
+
+        /** The audioOutputFormats bits offered for it (AAC-LC 48 kHz stereo by default). */
+        fun format(context: Context): Long =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_FORMAT, 0x800000L)
+
+        fun formatEntry(type: Int, format: Long): Map<String, Any?> =
+            linkedMapOf("type" to type, "audioType" to "media", "audioOutputFormats" to format)
+
+        fun info(variant: Int, type: Int, format: Long): Map<String, Any?> = linkedMapOf<String, Any?>().apply {
             if (variant and 1 != 0) put("bufferSizeMs", 120_000)
             if (variant and 2 != 0) put("audioBufferSize", AUDIO_BUFFER_BYTES)
+            if (variant and 4 != 0) put("audioFormats", listOf(formatEntry(type, format)))
         }
+
+        /** Stream types the probe accepts while the experiment is on. */
+        val CANDIDATE_TYPES = setOf(103, 104, 105)
         private const val DEFAULT_MODE = MODE_INFO
         const val STREAM_TYPE = 103
         const val AUDIO_BUFFER_BYTES = 8 * 1024 * 1024
