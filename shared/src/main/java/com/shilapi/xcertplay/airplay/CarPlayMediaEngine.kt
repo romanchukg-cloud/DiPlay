@@ -139,6 +139,10 @@ class CarPlayMediaEngine(
                 "rate=${format.sampleRate} channels=${format.channels} " +
                 "micPort=${(stream["dataPort"] as? Number)?.toInt() ?: 0}",
         )
+        // EXPERIMENT (lab): the raw choice, as fromFormatBits turns every Opus bit into 48 kHz.
+        session.logDebug("Audio: setup type=$type audioType=$audioType " +
+            "audioFormat=0x${java.lang.Long.toHexString((stream["audioFormat"] as? Number)?.toLong() ?: 0L)} " +
+            "stream=${stream.filterKeys { it != "shk" && !it.contains("key", ignoreCase = true) }}")
         val connectionId = stream["streamConnectionID"]
         val latencyMs = (stream["audioLatencyMs"] as? Number)?.toInt() ?: 0
         val meta = AudioMeta(type, format, connectionId, latencyMs)
