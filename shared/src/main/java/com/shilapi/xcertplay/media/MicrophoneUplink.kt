@@ -64,7 +64,7 @@ internal class MicrophoneUplink(
 
         val source = when (config.audioType) {
             "telephony" -> MediaRecorder.AudioSource.VOICE_COMMUNICATION
-            "speechrecognition" -> if (siriMode == SiriMicrophone.Mode.CALL) {
+            "speechrecognition" -> if (SiriMicrophone.callPath(siriMode)) {
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION
             } else {
                 MediaRecorder.AudioSource.VOICE_RECOGNITION
@@ -134,7 +134,7 @@ internal class MicrophoneUplink(
         socket = nextSocket
         opusEncoder = nextEncoder
         return try {
-            if (config.audioType == "telephony" || siriMode == SiriMicrophone.Mode.CALL) {
+            if (config.audioType == "telephony" || SiriMicrophone.callPath(siriMode)) {
                 effects = voiceEffects(nextRecorder.audioSessionId)
             }
             nextRecorder.startRecording()
@@ -239,9 +239,16 @@ internal class MicrophoneUplink(
     }
 
     private fun sendFrame(socket: DatagramSocket, counters: MicrophoneCounters, frame: ByteArray) {
-        if (siriMode != null) {
-            level.measure(frame, if (siriMode == SiriMicrophone.Mode.RECOGNITION_GAIN) SiriMicrophone.GAIN else 1)
-                ?.let { Log.i(TAG, "Microphone: Siri level mode=$siriMode $it") }
+        // EXPERIMENT (lab): the level Siri and calls get, in DiPlay's log to compare them.
+        if (siriMode != null || config.audioType == "telephony") {
+            val gain = if (siriMode == SiriMicrophone.Mode.RECOGNITION_GAIN || siriMode == SiriMicrophone.Mode.CALL_GAIN) {
+                SiriMicrophone.GAIN
+            } else 1
+            level.measure(frame, gain)?.let { report ->
+                val line = "Microphone: level ${config.audioType} mode=${siriMode ?: "call"} $report"
+                Log.i(TAG, line)
+                runCatching { onDiagnostic(line) }
+            }
         }
         val bodies = if (config.codec == AudioCodecKind.OPUS) {
             opusEncoder?.encode(frame).orEmpty()

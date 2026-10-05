@@ -690,4 +690,5 @@
     <string name="lab_byd_slider_call">Call</string>
     <string name="lab_byd_slider_voice">Voice</string>
     <string name="lab_byd_slider_navi">Navi</string>
+    <string name="lab_siri_microphone_call_gain">call +12 dB</string>
 </resources>

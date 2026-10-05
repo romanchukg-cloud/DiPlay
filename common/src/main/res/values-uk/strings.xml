@@ -642,4 +642,5 @@
     <string name="lab_byd_slider_call">Дзвінок</string>
     <string name="lab_byd_slider_voice">Voice</string>
     <string name="lab_byd_slider_navi">Наві</string>
+    <string name="lab_siri_microphone_call_gain">дзвінок +12 дБ</string>
 </resources>

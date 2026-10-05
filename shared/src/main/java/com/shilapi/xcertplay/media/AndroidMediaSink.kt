@@ -294,7 +294,7 @@ class AndroidMediaSink(
             // EXPERIMENT (lab): Siri on the call capture path also takes the call's audio mode, so the echo
             // canceller has its reference and the head unit treats Siri's voice like a call.
             if (config.audioType == "telephony" ||
-                (config.audioType == "speechrecognition" && SiriMicrophone.mode == SiriMicrophone.Mode.CALL)) {
+                (config.audioType == "speechrecognition" && SiriMicrophone.callPath(SiriMicrophone.mode))) {
                 enterCommunicationMode(id)
             }
             val uplink = microphoneUplinks.computeIfAbsent(id) { MicrophoneUplink(config, onAudioDiagnostic) }
