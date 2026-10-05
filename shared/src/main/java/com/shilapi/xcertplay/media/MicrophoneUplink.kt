@@ -139,7 +139,7 @@ internal class MicrophoneUplink(
         opusEncoder = nextEncoder
         return try {
             if (config.audioType == "telephony" || SiriMicrophone.callPath(siriMode)) {
-                effects = voiceEffects(nextRecorder.audioSessionId)
+                effects = voiceEffects(nextRecorder.audioSessionId, noiseSuppression = siriMode != SiriMicrophone.Mode.CALL_NO_NS)
             }
             nextRecorder.startRecording()
             stats.started(routeType(nextRecorder))
@@ -156,12 +156,22 @@ internal class MicrophoneUplink(
         }
     }
 
-    private fun voiceEffects(sessionId: Int): List<AudioEffect> = listOfNotNull(
+    private fun voiceEffects(sessionId: Int, noiseSuppression: Boolean = true): List<AudioEffect> = listOfNotNull(
         enabledEffect("AEC") {
             if (AcousticEchoCanceler.isAvailable()) AcousticEchoCanceler.create(sessionId) else null
         },
-        enabledEffect("NS") {
-            if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(sessionId) else null
+        if (noiseSuppression) {
+            enabledEffect("NS") { if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(sessionId) else null }
+        } else {
+            // EXPERIMENT (lab): the platform may attach a suppressor to VOICE_COMMUNICATION; turn it off.
+            runCatching {
+                if (NoiseSuppressor.isAvailable()) NoiseSuppressor.create(sessionId)?.also {
+                    val status = it.setEnabled(false)
+                    "microphone effect=NS disabled status=$status enabled=${it.enabled}".also { line ->
+                        Log.i(TAG, line); runCatching { onDiagnostic(line) }
+                    }
+                } else null
+            }.getOrNull()
         },
     )
 
@@ -246,9 +256,7 @@ internal class MicrophoneUplink(
     private fun sendFrame(socket: DatagramSocket, counters: MicrophoneCounters, frame: ByteArray) {
         // EXPERIMENT (lab): the level Siri and calls get, in DiPlay's log to compare them.
         if (siriMode != null || config.audioType == "telephony") {
-            val gain = if (siriMode == SiriMicrophone.Mode.RECOGNITION_GAIN || siriMode == SiriMicrophone.Mode.CALL_GAIN) {
-                SiriMicrophone.GAIN
-            } else 1
+            val gain = if (siriMode == SiriMicrophone.Mode.RECOGNITION_GAIN) SiriMicrophone.GAIN else 1
             val report = level.measure(frame, gain)
             runCatching { recording?.write(frame) }
             report?.let { report ->

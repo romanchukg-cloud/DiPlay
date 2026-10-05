@@ -21,12 +21,15 @@ object SiriMicrophone {
         RECOGNITION_GAIN,
         /** VOICE_COMMUNICATION with the platform echo canceller and noise suppressor, as calls use. */
         CALL,
-        /** [CALL] raised by [GAIN] (+12 dB), clipped at full scale. */
-        CALL_GAIN,
+        /**
+         * [CALL] with the echo canceller only: the noise suppressor gates the pauses between words to
+         * about -80 dBFS, which may end Siri's listening early.
+         */
+        CALL_NO_NS,
     }
 
     /** Whether [mode] captures on the call path (VOICE_COMMUNICATION, echo canceller, call audio mode). */
-    fun callPath(mode: Mode?): Boolean = mode == Mode.CALL || mode == Mode.CALL_GAIN
+    fun callPath(mode: Mode?): Boolean = mode == Mode.CALL || mode == Mode.CALL_NO_NS
 
     const val GAIN = 4
     private const val PREFS = "diplay"
