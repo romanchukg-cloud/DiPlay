@@ -749,7 +749,8 @@ class AirPlaySession(
                 in LabBufferedAudioProbe.CANDIDATE_TYPES -> if (config.labMainBuffered != 0) {
                     // EXPERIMENT (lab): accept the buffered music connection and log it.
                     labBufferedProbe?.close()
-                    val probe = LabBufferedAudioProbe({ debugLog(it) }, stream["streamConnectionID"], stream["shk"] as? ByteArray)
+                    val probe = LabBufferedAudioProbe({ debugLog(it) }, stream["streamConnectionID"], stream["shk"] as? ByteArray,
+                        long(stream["ct"])?.toInt() ?: 4, long(stream["audioFormat"]) ?: 0x800000L)
                         .also { labBufferedProbe = it }
                     debugLog("airplay buffered audio stream accepted dataPort=${probe.port} setup=" +
                         stream.mapValues { (key, value) -> if (key == "shk" || value is ByteArray) "<${(value as? ByteArray)?.size ?: "?"} bytes>" else value })

@@ -27,7 +27,14 @@ class LabBufferedAudioProbe internal constructor(
     val streamConnectionId: Any? = null,
     /** The stream key (shk) from the SETUP; without it frames are only counted. */
     private val key: ByteArray? = null,
+    /** The SETUP's compression type: 1 LPCM, 4 AAC (default). */
+    private val compression: Int = 4,
+    /** The SETUP's audioFormat bits, for PCM's rate and sample size. */
+    private val formatBits: Long = 0x800000L,
 ) : AutoCloseable {
+    private val pcm = compression == 1
+    private val pcm24 = formatBits and (0x1000L or 0x2000L or 0x10000L or 0x20000L) != 0L
+    private val sampleRate = if (formatBits and (0x400L or 0x800L or 0x1000L or 0x2000L) != 0L) 44_100 else SAMPLE_RATE
     private class Frame(val timestamp: Long, val payload: ByteArray)
 
     private val closed = AtomicBoolean(false)
@@ -90,8 +97,8 @@ class LabBufferedAudioProbe internal constructor(
                 val now = System.nanoTime()
                 if (now - lastReport >= REPORT_NS) {
                     val seconds = (now - started) / 1e9
-                    log("Buffered: frames=$count bytes=$bytes queued=${frames.size} (%.0f s of audio) after %.1f s"
-                        .format(java.util.Locale.US, frames.size * SAMPLES_PER_FRAME / SAMPLE_RATE.toDouble(), seconds))
+                    log("Buffered: frames=$count bytes=$bytes queued=${frames.size} after %.1f s (%.0f kbit/s)"
+                        .format(java.util.Locale.US, seconds, bytes * 8 / 1000.0 / seconds))
                     lastReport = now
                 }
             }
@@ -127,15 +134,24 @@ class LabBufferedAudioProbe internal constructor(
                 val frame = frames.poll(50, TimeUnit.MILLISECONDS) ?: continue
                 val until = flushUntil
                 if (until != null && before(frame.timestamp, until)) continue
+                if (playStartTimestamp == null) {
+                    playStartTimestamp = frame.timestamp
+                    runCatching { track?.flush() }
+                }
+                if (pcm) {
+                    // AirPlay PCM is big-endian; Android wants little-endian (24-bit packed or 16-bit).
+                    val out = track ?: openTrack().also { track = it; log("Buffered: PCM output ${sampleRate} Hz ${if (pcm24) 24 else 16}-bit") }
+                    val le = swapEndian(frame.payload, if (pcm24) 3 else 2)
+                    if (out.playState != AudioTrack.PLAYSTATE_PLAYING) out.play()
+                    out.write(le, 0, le.size, AudioTrack.WRITE_BLOCKING)
+                    if (played++ == 0L) log("Buffered: playback started (PCM)")
+                    continue
+                }
                 val decoder = codec ?: openDecoder(frame.payload).also { codec = it } ?: return
                 val input = decoder.dequeueInputBuffer(20_000)
                 if (input >= 0) {
                     decoder.getInputBuffer(input)?.apply { clear(); put(frame.payload) }
                     decoder.queueInputBuffer(input, 0, frame.payload.size, 0, 0)
-                }
-                if (playStartTimestamp == null) {
-                    playStartTimestamp = frame.timestamp
-                    runCatching { track?.flush() }
                 }
                 while (true) {
                     val output = decoder.dequeueOutputBuffer(info, 0)
@@ -173,13 +189,15 @@ class LabBufferedAudioProbe internal constructor(
     }.onFailure { log("Buffered: decoder failed ${it.message}") }.getOrNull()
 
     private fun openTrack(): AudioTrack {
-        val min = AudioTrack.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT)
+        val encoding = if (pcm && pcm24) AudioFormat.ENCODING_PCM_24BIT_PACKED else AudioFormat.ENCODING_PCM_16BIT
+        val frameBytes = if (pcm && pcm24) 6 else 4
+        val min = AudioTrack.getMinBufferSize(sampleRate, AudioFormat.CHANNEL_OUT_STEREO, encoding)
         return AudioTrack.Builder()
             .setAudioAttributes(AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_MEDIA)
                 .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build())
-            .setAudioFormat(AudioFormat.Builder().setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setSampleRate(SAMPLE_RATE).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build())
-            .setBufferSizeInBytes(maxOf(min * 2, SAMPLE_RATE * 4 * TRACK_BUFFER_MS / 1000))
+            .setAudioFormat(AudioFormat.Builder().setEncoding(encoding)
+                .setSampleRate(sampleRate).setChannelMask(AudioFormat.CHANNEL_OUT_STEREO).build())
+            .setBufferSizeInBytes(maxOf(min * 2, sampleRate * frameBytes * TRACK_BUFFER_MS / 1000))
             .setTransferMode(AudioTrack.MODE_STREAM)
             .build()
     }
@@ -222,7 +240,7 @@ class LabBufferedAudioProbe internal constructor(
         val at = anchorNtp ?: return null
         if (rate == 0) return rtp
         val elapsed = maxOf(0.0, nowNtp.subtract(at).toDouble() / 4294967296.0)
-        return (rtp + Math.round(elapsed * SAMPLE_RATE)) and 0xffff_ffffL
+        return (rtp + Math.round(elapsed * sampleRate)) and 0xffff_ffffL
     }
 
     /** The anchor as SETRATE and GETANCHOR return it (networkTimeFrac as a 64-bit fraction, as in AirPlay 2). */
@@ -280,6 +298,17 @@ class LabBufferedAudioProbe internal constructor(
         private fun u32(bytes: ByteArray, offset: Int): Long =
             ((bytes[offset].toLong() and 0xff) shl 24) or ((bytes[offset + 1].toLong() and 0xff) shl 16) or
                 ((bytes[offset + 2].toLong() and 0xff) shl 8) or (bytes[offset + 3].toLong() and 0xff)
+
+        /** Reverses each [width]-byte sample: big-endian network PCM to Android's little-endian. */
+        private fun swapEndian(data: ByteArray, width: Int): ByteArray {
+            val out = ByteArray(data.size - data.size % width)
+            var i = 0
+            while (i < out.size) {
+                for (k in 0 until width) out[i + k] = data[i + width - 1 - k]
+                i += width
+            }
+            return out
+        }
 
         /** Whether RTP timestamp [a] comes before [b], across the 32-bit wrap. */
         private fun before(a: Long, b: Long): Boolean = ((a - b) and 0xffff_ffffL) >= 0x8000_0000L
