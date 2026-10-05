@@ -1417,9 +1417,32 @@ class CarPlayHostActivity : ComponentActivity() {
             textSize = 22f
             setOnClickListener { setLabSplit(false) }
         })
-        container.addView(panel, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1f))
-        container.addView(View(this), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 2f))
+        labPanelView = panel
+        labPanelSpacer = View(this)
+        arrangeLabSidePanel(portrait = false, container)
         return container
+    }
+
+    private var labPanelView: View? = null
+    private var labPanelSpacer: View? = null
+
+    // Landscape: the panel is the left third; portrait: a band at the bottom third. The spacer is never
+    // clickable, so touches there reach CarPlay.
+    private fun arrangeLabSidePanel(portrait: Boolean, container: LinearLayout? = null) {
+        val panel = labPanelView ?: return
+        val spacer = labPanelSpacer ?: return
+        val row = container ?: (labSideContainer as? LinearLayout) ?: return
+        row.removeAllViews()
+        row.orientation = if (portrait) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
+        fun params(weight: Float) = if (portrait) LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, weight)
+            else LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
+        if (portrait) {
+            row.addView(spacer, params(2f))
+            row.addView(panel, params(1f))
+        } else {
+            row.addView(panel, params(1f))
+            row.addView(spacer, params(2f))
+        }
     }
 
     private fun setLabSplit(on: Boolean) {
@@ -1431,7 +1454,7 @@ class CarPlayHostActivity : ComponentActivity() {
         val kinds = labAreaKinds
         val areas = display?.areas
         val sent = if (areas != null && kinds != null) {
-            val side = kinds.indexOf(LabAreas.Kind.SIDE_PANEL)
+            val side = kinds.indexOf(if (screenPortrait()) LabAreas.Kind.SIDE_PANEL_PORTRAIT else LabAreas.Kind.SIDE_PANEL)
             val view = videoView
             val target = if (on) side else view?.let {
                 LabAreas.pick(areas, kinds, it.width, it.height, screenPortrait(), isMultiWindowActive())
@@ -1446,6 +1469,7 @@ class CarPlayHostActivity : ComponentActivity() {
         appendLog("Lab split screen ${if (on) "on" else "off"} sent=$sent")
         if (!sent) return
         labSplitActive = on
+        if (on) arrangeLabSidePanel(screenPortrait())
         labSideContainer?.visibility = if (on) View.VISIBLE else View.GONE
         mainHandler.removeCallbacks(labPanelTick)
         if (on) labPanelTick.run()
@@ -3515,6 +3539,11 @@ class CarPlayHostActivity : ComponentActivity() {
                 val landscape = areas[0]
                 val left = landscape.width / 3
                 add(LabAreas.Kind.SIDE_PANEL, landscape.width - (left and 1.inv()), landscape.height, left)
+                if (rotationAreas) {
+                    // On the portrait screen the panel is a band at the bottom, as BYD's own portrait layout.
+                    val portraitArea = areas[1]
+                    add(LabAreas.Kind.SIDE_PANEL_PORTRAIT, portraitArea.width, portraitArea.height * 2 / 3)
+                }
             }
             val initial = LabAreas.pick(areas, kinds, size.width, size.height, screenPortrait(), isMultiWindowActive()) ?: 0
             labAreaKinds = kinds
@@ -4322,7 +4351,11 @@ class CarPlayHostActivity : ComponentActivity() {
         display.areas?.let { areas ->
             var index = (rotationAreaAhead ?: display.area).coerceIn(0, areas.lastIndex)
             // Beside the side panel CarPlay draws in part of the landscape area; lay out that whole area.
-            if (labAreaKinds?.getOrNull(index) == LabAreas.Kind.SIDE_PANEL) index = labAreaKinds?.indexOf(LabAreas.Kind.LANDSCAPE) ?: 0
+            when (labAreaKinds?.getOrNull(index)) {
+                LabAreas.Kind.SIDE_PANEL -> index = labAreaKinds?.indexOf(LabAreas.Kind.LANDSCAPE) ?: 0
+                LabAreas.Kind.SIDE_PANEL_PORTRAIT -> index = labAreaKinds?.indexOf(LabAreas.Kind.PORTRAIT) ?: 0
+                else -> Unit
+            }
             val area = areas[index]
             val viewArea = LabAreas.pick(areas, labAreaKinds, viewWidth, viewHeight, screenPortrait(), isMultiWindowActive())
             if (rotationAreaAhead != null && viewArea != index) {

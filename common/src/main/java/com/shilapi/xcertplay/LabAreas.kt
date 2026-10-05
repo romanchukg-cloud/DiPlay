@@ -11,6 +11,8 @@ object LabAreas {
         LANDSCAPE(false, false), PORTRAIT(true, false), LANDSCAPE_SPLIT(false, true), PORTRAIT_SPLIT(true, true),
         /** The right two thirds beside DiPlay's side panel; only the panel's button picks it. */
         SIDE_PANEL(false, false, manual = true),
+        /** On the portrait screen: the top two thirds above DiPlay's panel. */
+        SIDE_PANEL_PORTRAIT(true, false, manual = true),
     }
 
     /** A window more than this far (as an aspect ratio) from every area needs a reconnect instead. */
