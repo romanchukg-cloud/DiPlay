@@ -136,9 +136,13 @@ class AirPlaySession(
     private fun labBufferedRequest(method: String, body: Map<String, Any?>?): RtspMessage.Response? {
         val probe = labBufferedProbe ?: return null
         when (method) {
-            "SETRATE" -> probe.setRate(long(body?.get("rtpTime")), long(body?.get("rate"))?.toInt() ?: 1, syncedNtp())
+            "SETRATE", "SETRATEANCHORTIME" ->
+                probe.setRate(long(body?.get("rtpTime")), long(body?.get("rate"))?.toInt() ?: 1, syncedNtp())
             "GETANCHOR" -> Unit
-            "FLUSHBUFFERED" -> return RtspMessage.Response(status = 200)
+            "FLUSHBUFFERED" -> {
+                probe.flush(long(body?.get("flushUntilTS")))
+                return RtspMessage.Response(status = 200)
+            }
             else -> return null
         }
         val anchor = probe.anchorPlist(config.labMainBufferedEpoch) ?: return RtspMessage.Response(status = 200)
@@ -745,7 +749,8 @@ class AirPlaySession(
                 in LabBufferedAudioProbe.CANDIDATE_TYPES -> if (config.labMainBuffered != 0) {
                     // EXPERIMENT (lab): accept the buffered music connection and log it.
                     labBufferedProbe?.close()
-                    val probe = LabBufferedAudioProbe({ debugLog(it) }, stream["streamConnectionID"]).also { labBufferedProbe = it }
+                    val probe = LabBufferedAudioProbe({ debugLog(it) }, stream["streamConnectionID"], stream["shk"] as? ByteArray)
+                        .also { labBufferedProbe = it }
                     debugLog("airplay buffered audio stream accepted dataPort=${probe.port} setup=" +
                         stream.mapValues { (key, value) -> if (key == "shk" || value is ByteArray) "<${(value as? ByteArray)?.size ?: "?"} bytes>" else value })
                     activeStreams.add(type)
