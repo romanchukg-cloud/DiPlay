@@ -131,6 +131,23 @@ class AirPlaySession(
 
     @Volatile private var labBufferedProbe: LabBufferedAudioProbe? = null // lab
 
+    /** EXPERIMENT (lab): reports the buffered stream's (pretended) playback position, as for the other audio streams. */
+    private fun labBufferedFeedback(body: Map<String, Any?>?): Map<String, Any?>? {
+        val probe = labBufferedProbe ?: return body
+        val sample = probe.playbackSample() ?: return body
+        val nowNs = System.nanoTime()
+        val entry = linkedMapOf<String, Any?>(
+            "type" to LabBufferedAudioProbe.STREAM_TYPE,
+            "sampleRate" to LabBufferedAudioProbe.SAMPLE_RATE,
+            "streamConnectionID" to unsignedPlistInteger(probe.streamConnectionId ?: 0L),
+            "timestamp" to syncedNtp(),
+            "timestampRawNs" to nowNs,
+            "sampleTime" to sample,
+        )
+        val streams = (body?.get("streams") as? List<*>).orEmpty() + entry
+        return linkedMapOf<String, Any?>().apply { body?.let { putAll(it) }; put("streams", streams) }
+    }
+
     override fun close() {
         if (!closed.compareAndSet(false, true)) return
         labBufferedProbe?.close()
@@ -579,7 +596,7 @@ class AirPlaySession(
             }
             request.method == "POST" && path.endsWith("/command") -> handleCommand(request)
             request.method == "POST" && path.endsWith("/feedback") -> {
-                val body = media.onFeedback(this)
+                val body = labBufferedFeedback(media.onFeedback(this))
                 if (body == null) {
                     RtspMessage.Response(status = 200)
                 } else {
@@ -712,8 +729,9 @@ class AirPlaySession(
                 in LabBufferedAudioProbe.CANDIDATE_TYPES -> if (config.labMainBuffered != 0) {
                     // EXPERIMENT (lab): accept the buffered music connection and log it.
                     labBufferedProbe?.close()
-                    val probe = LabBufferedAudioProbe { debugLog(it) }.also { labBufferedProbe = it }
-                    debugLog("airplay buffered audio stream accepted dataPort=${probe.port}")
+                    val probe = LabBufferedAudioProbe({ debugLog(it) }, stream["streamConnectionID"]).also { labBufferedProbe = it }
+                    debugLog("airplay buffered audio stream accepted dataPort=${probe.port} setup=" +
+                        stream.mapValues { (key, value) -> if (key == "shk" || value is ByteArray) "<${(value as? ByteArray)?.size ?: "?"} bytes>" else value })
                     activeStreams.add(type)
                     result.add(linkedMapOf("type" to type, "dataPort" to probe.port,
                         "audioBufferSize" to LabBufferedAudioProbe.AUDIO_BUFFER_BYTES))

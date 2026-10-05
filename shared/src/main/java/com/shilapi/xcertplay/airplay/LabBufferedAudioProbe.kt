@@ -11,7 +11,16 @@ import java.util.concurrent.atomic.AtomicBoolean
  * accepts the iPhone's buffered music connection and only logs what arrives (frame sizes, the first
  * bytes, totals). Nothing is decoded or played, so music is silent while the iPhone uses this path.
  */
-class LabBufferedAudioProbe internal constructor(private val log: (String) -> Unit) : AutoCloseable {
+class LabBufferedAudioProbe internal constructor(
+    private val log: (String) -> Unit,
+    /** The streamConnectionID from the stream's SETUP, echoed in /feedback like the other audio streams. */
+    val streamConnectionId: Any? = null,
+) : AutoCloseable {
+    /** RTP timestamp of the first frame and when it arrived: the probe pretends to play from there. */
+    @Volatile var firstTimestamp: Long? = null
+        private set
+    @Volatile var firstNs: Long = 0L
+        private set
     private val closed = AtomicBoolean(false)
     private val server = ServerSocket(0)
     private var client: Socket? = null
@@ -37,6 +46,11 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
                 input.readFully(body)
                 frames++
                 bytes += length
+                if (frames == 1L && body.size >= 8) {
+                    firstTimestamp = ((body[4].toLong() and 0xff) shl 24) or ((body[5].toLong() and 0xff) shl 16) or
+                        ((body[6].toLong() and 0xff) shl 8) or (body[7].toLong() and 0xff)
+                    firstNs = System.nanoTime()
+                }
                 if (frames <= FIRST_FRAMES) {
                     val seq = if (body.size >= 4) ((body[2].toInt() and 0xff) shl 8) or (body[3].toInt() and 0xff) else -1
                     val ts = if (body.size >= 8) ((body[4].toLong() and 0xff) shl 24) or ((body[5].toLong() and 0xff) shl 16) or
@@ -54,6 +68,13 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
         } catch (error: Exception) {
             if (!closed.get()) log("Buffered probe: ended ${error.javaClass.simpleName}: ${error.message}")
         }
+    }
+
+    /** The sample the pretended playback has reached, or null before the first frame. */
+    fun playbackSample(nowNs: Long = System.nanoTime()): Long? {
+        val first = firstTimestamp ?: return null
+        val elapsed = maxOf(0.0, (nowNs - firstNs) / 1e9 - PRETEND_LATENCY_MS / 1000.0)
+        return (first + Math.round(elapsed * SAMPLE_RATE)) and 0xffff_ffffL
     }
 
     override fun close() {
@@ -103,6 +124,9 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
         val CANDIDATE_TYPES = setOf(103, 104, 105)
         private const val DEFAULT_MODE = MODE_INFO
         const val STREAM_TYPE = 103
+        const val SAMPLE_RATE = 48_000
+        /** How far behind arrival the pretended playback runs, like a receiver's output latency. */
+        private const val PRETEND_LATENCY_MS = 500
         const val AUDIO_BUFFER_BYTES = 8 * 1024 * 1024
         /** AirPlay 2's "supports buffered audio" feature bit. */
         const val FEATURE_BIT = 1L shl 40
