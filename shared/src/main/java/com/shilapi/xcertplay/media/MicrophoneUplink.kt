@@ -272,6 +272,13 @@ internal class MicrophoneUplink(
         }
         stats.encoded(bodies.size, if (bodies.isEmpty()) 1 else bodies.count { it.isEmpty() })
         bodies.forEach { body ->
+            // EXPERIMENT (lab): our timestamp step and packet duration, next to the iPhone's.
+            if (counters.sequence < TX_TIMING_LOG_COUNT) {
+                val line = "Mic tx timing type=${config.audioType} n=${counters.sequence + 1} ts=${counters.timestamp.toUInt()} " +
+                    "dTs=${config.rtpSamplesPerPacket} bytes=${body.size} " +
+                    if (config.codec == AudioCodecKind.OPUS) com.shilapi.xcertplay.airplay.OpusToc.describe(body) else "pcm"
+                runCatching { onDiagnostic(line) }
+            }
             sendPacket(
                 socket = socket,
                 counters = counters,
@@ -400,6 +407,7 @@ internal class MicrophoneUplink(
     }
 
     private companion object {
+        const val TX_TIMING_LOG_COUNT = 25 // lab
         const val TAG = "xcertplay-usb"
         const val MIN_READ_BYTES = 2_048
         const val CLOSE_JOIN_MILLIS = 500L

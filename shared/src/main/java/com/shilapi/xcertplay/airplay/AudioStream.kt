@@ -83,6 +83,8 @@ class AudioStream(
         controlThread?.interrupt()
     }
 
+    private var lastTimingSample: Int? = null // lab
+
     private fun runData(socket: DatagramSocket, listener: Listener) {
         val stats = StreamReceiveStats("audio type=$streamType", onDiagnostic)
         val buffer = ByteArray(DATAGRAM_BYTES)
@@ -146,6 +148,14 @@ class AudioStream(
                 }
                 val rtp = wire.copyOf(RTP_HEADER_LEN) + payload
                 val decryptedNumber = decryptedPackets.incrementAndGet()
+                // EXPERIMENT (lab): the iPhone's own timestamp step and packet duration on voice streams.
+                if (streamType == 100 && decryptedNumber <= TIMING_LOG_COUNT) {
+                    val seq = ((wire[2].toInt() and 0xff) shl 8) or (wire[3].toInt() and 0xff)
+                    onDiagnostic("Audio rx timing type=$streamType n=$decryptedNumber seq=$seq ts=${sample.toUInt()} " +
+                        "dTs=${lastTimingSample?.let { (sample - it).toString() } ?: "-"} bytes=${payload.size} " +
+                        OpusToc.describe(payload))
+                    lastTimingSample = sample
+                }
                 if (decryptedNumber <= FIRST_PACKET_LOG_COUNT) {
                     android.util.Log.i(
                         TAG,
@@ -207,6 +217,7 @@ class AudioStream(
         const val NONCE_LEN = 8
         const val TAIL_LEN = TAG_LEN + NONCE_LEN
         const val FIRST_PACKET_LOG_COUNT = 3
+        const val TIMING_LOG_COUNT = 25 // lab
         const val PACKET_LOG_INTERVAL = 100
     }
 }
