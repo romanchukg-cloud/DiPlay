@@ -3473,7 +3473,8 @@ class CarPlayHostActivity : ComponentActivity() {
                 kinds += kind
             }
             val canvas = if (rotationAreas) {
-                val side = LabRotation.squareSide(long, hevcEnabled)
+                val cap = LabRotation.maxSide(this).takeIf { it > 0 } ?: long
+                val side = LabRotation.squareSide(minOf(long, cap), hevcEnabled)
                 val areaShort = (side.toLong() * shortSide / long).toInt()
                 add(LabAreas.Kind.LANDSCAPE, side, areaShort)
                 add(LabAreas.Kind.PORTRAIT, areaShort, side)

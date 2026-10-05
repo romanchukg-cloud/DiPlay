@@ -14,6 +14,11 @@ object LabRotation {
     /** The running host's hook: the screen has started to turn (the motor takes about 3 s). */
     @Volatile var onRotateKey: (() -> Unit)? = null
 
+    /** The largest square side to ask for (lab setting; 0 = as large as the decoder and screen allow). */
+    fun maxSide(context: android.content.Context): Int =
+        context.getSharedPreferences("diplay_lab_split_screen", android.content.Context.MODE_PRIVATE)
+            .getInt("rotation_max_side", 0)
+
     /** How long after the key to move CarPlay to the new orientation (lab setting, default 1.5 s). */
     fun leadMillis(context: android.content.Context): Long =
         context.getSharedPreferences("diplay_lab_split_screen", android.content.Context.MODE_PRIVATE)
