@@ -67,6 +67,12 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
         private const val REPORT_NS = 5_000_000_000L
         private const val PREFS = "diplay"
         private const val KEY = "lab_main_buffered"
+        private const val KEY_MODE = "lab_main_buffered_mode"
+        /** Parts of the offer, to find which one the iPhone accepts: the feature bit, mainBufferedInfo, the 103 format. */
+        const val MODE_FEATURE = 1
+        const val MODE_INFO = 2
+        const val MODE_FORMAT = 4
+        private const val DEFAULT_MODE = MODE_INFO
         const val STREAM_TYPE = 103
         const val AUDIO_BUFFER_BYTES = 8 * 1024 * 1024
         /** AirPlay 2's "supports buffered audio" feature bit. */
@@ -74,6 +80,10 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
 
         fun enabled(context: Context): Boolean =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY, false)
+
+        /** The parts offered while enabled (0 when off). */
+        fun mode(context: Context): Int = if (!enabled(context)) 0 else
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_MODE, DEFAULT_MODE)
 
         fun setEnabled(context: Context, on: Boolean) =
             context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY, on).apply()

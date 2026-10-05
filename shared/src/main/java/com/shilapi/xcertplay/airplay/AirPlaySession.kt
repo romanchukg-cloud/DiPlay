@@ -532,7 +532,7 @@ class AirPlaySession(
 
         val path = request.path.lowercase()
         // EXPERIMENT (lab): buffered audio is driven by requests DiPlay does not handle (SETRATEANCHORTIME...).
-        if (config.labMainBuffered && request.method !in setOf("GET", "POST", "OPTIONS")) {
+        if (config.labMainBuffered != 0 && request.method !in setOf("GET", "POST", "OPTIONS")) {
             val decoded = runCatching { BplistCodec.decode(request.body).toString() }.getOrNull()
             debugLog("airplay request method=${request.method} path=${request.path} " +
                 "body=${decoded ?: "${request.body.size} bytes"}")
@@ -707,7 +707,7 @@ class AirPlaySession(
                         result.add(streamResponse)
                     }
                 }
-                LabBufferedAudioProbe.STREAM_TYPE -> if (config.labMainBuffered) {
+                LabBufferedAudioProbe.STREAM_TYPE -> if (config.labMainBuffered != 0) {
                     // EXPERIMENT (lab): accept the buffered music connection and log it.
                     labBufferedProbe?.close()
                     val probe = LabBufferedAudioProbe { debugLog(it) }.also { labBufferedProbe = it }

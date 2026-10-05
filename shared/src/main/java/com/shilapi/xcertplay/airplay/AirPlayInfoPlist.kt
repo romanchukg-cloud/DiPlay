@@ -28,7 +28,7 @@ object AirPlayInfoPlist {
     /** Discovery and /info must describe the same receiver capabilities. */
     fun features(config: AirPlayConfig): Long =
         (if (config.disableAudioOutput) CARPLAY_FEATURES_NO_AUDIO else CARPLAY_FEATURES) or
-            (if (config.labMainBuffered) LabBufferedAudioProbe.FEATURE_BIT else 0L) // EXPERIMENT (lab)
+            (if (config.labMainBuffered and LabBufferedAudioProbe.MODE_FEATURE != 0) LabBufferedAudioProbe.FEATURE_BIT else 0L) // lab
 
     fun build(config: AirPlayConfig): Map<String, Any?> {
         val displays = arrayListOf<Any?>(
@@ -54,7 +54,7 @@ object AirPlayInfoPlist {
             info["audioLatencies"] = audioLatencies()
             info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone, config.labSiriPcm16k) +
                 // EXPERIMENT (lab): the buffered music stream with the same AAC-LC as type 102.
-                if (config.labMainBuffered) listOf(linkedMapOf<String, Any?>(
+                if (config.labMainBuffered and LabBufferedAudioProbe.MODE_FORMAT != 0) listOf(linkedMapOf<String, Any?>(
                     "type" to LabBufferedAudioProbe.STREAM_TYPE,
                     "audioType" to "media",
                     "audioOutputFormats" to if (config.entertainmentSampleRate == 48000) 0x800000 else 0x400000,
@@ -82,7 +82,7 @@ object AirPlayInfoPlist {
         }
         if (config.hevc) info["hevcInfo"] = emptyMap<String, Any?>()
         // EXPERIMENT (lab): CarPlay Simulator lists mainBufferedInfo among the /info keys.
-        if (config.labMainBuffered) info["mainBufferedInfo"] = emptyMap<String, Any?>()
+        if (config.labMainBuffered and LabBufferedAudioProbe.MODE_INFO != 0) info["mainBufferedInfo"] = emptyMap<String, Any?>()
         // EXPERIMENT: the key CarPlay Simulator and BYD's own CarPlay pair with the enhancedSiri feature.
         // EXPERIMENT: what may be limited while driving, as CarPlay Simulator lists it (not japanMaps).
         if (config.limitedUiByGear) {

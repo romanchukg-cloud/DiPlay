@@ -3606,7 +3606,7 @@ class CarPlayHostActivity : ComponentActivity() {
             // EXPERIMENT: the Enhanced Siri probe made the iPhone use its own mic and speaker for Siri.
             enhancedSiriProbe = false,
             labSiriPcm16k = com.shilapi.xcertplay.media.SiriMicrophone.pcm16k(this), // EXPERIMENT (lab)
-            labMainBuffered = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.enabled(this), // EXPERIMENT (lab)
+            labMainBuffered = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.mode(this), // EXPERIMENT (lab)
             limitedUiByGear = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this), // EXPERIMENT
         )
     }

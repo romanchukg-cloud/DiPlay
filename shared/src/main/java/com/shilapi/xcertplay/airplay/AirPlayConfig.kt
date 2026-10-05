@@ -84,5 +84,5 @@ data class AirPlayConfig(
     /** EXPERIMENT (lab): offer only uncompressed 16 kHz mono PCM for Siri's microphone. */
     val labSiriPcm16k: Boolean = false,
     /** EXPERIMENT (lab): offer CarPlay's main buffered audio and log what the iPhone does with it. */
-    val labMainBuffered: Boolean = false,
+    val labMainBuffered: Int = 0,
 )
