@@ -71,7 +71,11 @@ internal class MicrophoneUplink(
             }
             else -> MediaRecorder.AudioSource.MIC
         }
-        siriMode?.let { Log.i(TAG, "Microphone: Siri lab mode=$it source=$source") }
+        siriMode?.let { mode ->
+            val line = "Microphone: Siri lab mode=$mode source=$source"
+            Log.i(TAG, line)
+            runCatching { onDiagnostic(line) }
+        }
         val nextEncoder = if (config.codec == AudioCodecKind.OPUS) {
             OpusEncoder(config.bitrate ?: 48_000).takeIf { it.available }
         } else {
