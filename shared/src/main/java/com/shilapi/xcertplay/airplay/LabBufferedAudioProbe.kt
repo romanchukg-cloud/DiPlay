@@ -101,12 +101,14 @@ class LabBufferedAudioProbe internal constructor(
     }
 
     /** The anchor as SETRATE and GETANCHOR return it (networkTimeFrac as a 64-bit fraction, as in AirPlay 2). */
-    fun anchorPlist(): Map<String, Any?>? {
+    fun anchorPlist(epochVariant: Int = 0): Map<String, Any?>? {
         val rtp = anchorRtp ?: return null
         val at = anchorNtp ?: return null
+        // Variant 1: seconds on the AirTunes (1970) epoch rather than NTP's 1900.
+        val secs = at.shiftRight(32).toLong() - if (epochVariant == 1) NTP_UNIX_OFFSET else 0L
         return linkedMapOf(
             "rtpTime" to rtp,
-            "networkTimeSecs" to at.shiftRight(32).toLong(),
+            "networkTimeSecs" to secs,
             "networkTimeFrac" to at.and(java.math.BigInteger.valueOf(0xffff_ffffL)).shiftLeft(32),
             "rate" to rate,
         )
@@ -160,6 +162,11 @@ class LabBufferedAudioProbe internal constructor(
         private const val DEFAULT_MODE = MODE_INFO
         const val STREAM_TYPE = 103
         const val SAMPLE_RATE = 48_000
+        private const val NTP_UNIX_OFFSET = 2_208_988_800L
+        private const val KEY_EPOCH = "lab_main_buffered_epoch"
+
+        fun epochVariant(context: Context): Int =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_EPOCH, 1)
         /** How far behind arrival the pretended playback runs, like a receiver's output latency. */
         private const val PRETEND_LATENCY_MS = 500
         const val AUDIO_BUFFER_BYTES = 8 * 1024 * 1024

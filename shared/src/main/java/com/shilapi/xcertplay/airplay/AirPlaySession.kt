@@ -141,7 +141,7 @@ class AirPlaySession(
             "FLUSHBUFFERED" -> return RtspMessage.Response(status = 200)
             else -> return null
         }
-        val anchor = probe.anchorPlist() ?: return RtspMessage.Response(status = 200)
+        val anchor = probe.anchorPlist(config.labMainBufferedEpoch) ?: return RtspMessage.Response(status = 200)
         if (method != "GETANCHOR" || labAnchorLogs++ < 3) debugLog("airplay $method anchor=$anchor")
         return RtspMessage.Response(headers = mapOf("Content-Type" to PLIST_CONTENT_TYPE), body = BplistCodec.encode(anchor))
     }

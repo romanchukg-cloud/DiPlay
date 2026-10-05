@@ -3610,6 +3610,7 @@ class CarPlayHostActivity : ComponentActivity() {
             labMainBufferedInfo = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.infoVariant(this), // lab
             labMainBufferedType = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.streamType(this), // lab
             labMainBufferedFormat = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.format(this), // lab
+            labMainBufferedEpoch = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.epochVariant(this), // lab
             limitedUiByGear = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this), // EXPERIMENT
         )
     }

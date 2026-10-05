@@ -88,4 +88,5 @@ data class AirPlayConfig(
     val labMainBufferedInfo: Int = 0,
     val labMainBufferedType: Int = 103,
     val labMainBufferedFormat: Long = 0x800000L,
+    val labMainBufferedEpoch: Int = 1,
 )
