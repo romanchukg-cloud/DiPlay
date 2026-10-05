@@ -421,12 +421,14 @@ class CarPlayHostActivity : ComponentActivity() {
     private val mainHandler = Handler(Looper.getMainLooper())
     // EXPERIMENT (lab): the rotation area CarPlay was asked to use ahead of Android's own rotation.
     private var rotationAreaAhead: Int? = null
+    // EXPERIMENT (lab): what each declared area is for (orientation, split screen).
+    private var labAreaKinds: List<LabAreas.Kind>? = null
     private val rotationAheadTimeout = Runnable {
         val ahead = rotationAreaAhead ?: return@Runnable
         rotationAreaAhead = null
         val view = videoView ?: return@Runnable
         val areas = sessionDisplay?.areas ?: return@Runnable
-        val area = LabAreas.closest(areas, view.width, view.height) ?: return@Runnable
+        val area = LabAreas.pick(areas, labAreaKinds, view.width, view.height, screenPortrait(), isMultiWindowActive()) ?: return@Runnable
         if (area != ahead) controller?.labViewArea(area, 300, areas.indices.filter { it != area })
         updateVideoLayout(view.width, view.height)
         appendLog("Lab rotation: the screen did not turn; back to view area $area")
@@ -3465,23 +3467,35 @@ class CarPlayHostActivity : ComponentActivity() {
             val long = maxOf(size.width, size.height)
             val shortSide = minOf(size.width, size.height)
             val areas = mutableListOf<com.shilapi.xcertplay.airplay.AirPlayAreaSize>()
+            val kinds = mutableListOf<LabAreas.Kind>()
+            fun add(kind: LabAreas.Kind, width: Int, height: Int) {
+                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(width and 1.inv(), height and 1.inv())
+                kinds += kind
+            }
             val canvas = if (rotationAreas) {
                 val side = LabRotation.squareSide(long, hevcEnabled)
-                val areaShort = (side.toLong() * shortSide / long).toInt() and 1.inv()
-                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(side, areaShort)
-                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(areaShort, side)
+                val areaShort = (side.toLong() * shortSide / long).toInt()
+                add(LabAreas.Kind.LANDSCAPE, side, areaShort)
+                add(LabAreas.Kind.PORTRAIT, areaShort, side)
                 side to side
             } else {
-                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(plainDisplay.widthPixels, plainDisplay.heightPixels)
+                add(LabAreas.Kind.LANDSCAPE, plainDisplay.widthPixels, plainDisplay.heightPixels)
                 plainDisplay.widthPixels to plainDisplay.heightPixels
             }
             if (splitArea) {
-                val fraction = LabSplitScreen.splitWindowFraction(this) ?: (0.5f to 1f)
-                val landscape = areas.first()
-                areas += com.shilapi.xcertplay.airplay.AirPlayAreaSize(
-                    (landscape.width * fraction.first).toInt() and 1.inv(), (landscape.height * fraction.second).toInt() and 1.inv())
+                // BYD splits the landscape screen left/right and the portrait one top/bottom; each window size
+                // seen before is kept, else a plain half.
+                val landscape = areas[0]
+                val land = LabSplitScreen.splitWindowFraction(this, portrait = false) ?: (0.5f to 1f)
+                add(LabAreas.Kind.LANDSCAPE_SPLIT, (landscape.width * land.first).toInt(), (landscape.height * land.second).toInt())
+                if (rotationAreas) {
+                    val portraitArea = areas[1]
+                    val port = LabSplitScreen.splitWindowFraction(this, portrait = true) ?: (1f to 0.5f)
+                    add(LabAreas.Kind.PORTRAIT_SPLIT, (portraitArea.width * port.first).toInt(), (portraitArea.height * port.second).toInt())
+                }
             }
-            val initial = LabAreas.closest(areas, size.width, size.height) ?: 0
+            val initial = LabAreas.pick(areas, kinds, size.width, size.height, screenPortrait(), isMultiWindowActive()) ?: 0
+            labAreaKinds = kinds
             appendLog("Lab areas: canvas ${canvas.first}x${canvas.second} areas=$areas initial=$initial")
             // A square canvas spans the screen's long side, whichever way DiPlay started, so the UI scale stays put.
             val longMm = listOfNotNull(plainDisplay.widthPhysicalMm, plainDisplay.heightPhysicalMm).maxOrNull()
@@ -4122,7 +4136,7 @@ class CarPlayHostActivity : ComponentActivity() {
         // EXPERIMENT (lab): the declared areas follow DiPlay's window (rotation, split screen) without
         // reconnecting, as long as one of them has about the window's shape.
         val areas = display?.areas
-        val areaFor = areas?.let { LabAreas.closest(it, size.width, size.height) }
+        val areaFor = areas?.let { LabAreas.pick(it, labAreaKinds, size.width, size.height, screenPortrait(), isMultiWindowActive()) }
         if (display != null && areas != null && areaFor != null && controller != null && !menuOpen &&
             !handshakeResetInProgress && !shuttingDown.get()) {
             val previous = activeDisplaySize
@@ -4133,12 +4147,14 @@ class CarPlayHostActivity : ComponentActivity() {
             sessionDisplay = display.copy(rotation = displayRotation(), area = areaFor)
             val sent = if (areaFor == display.area || areaFor == ahead) "kept" else
                 controller?.labViewArea(areaFor, 300, areas.indices.filter { it != areaFor }).toString()
-            // The split window (narrower than the landscape area) is remembered for the next session.
-            if (areaFor == areas.lastIndex && areas.size > 1 && LabSplitScreen.halfArea(this)) {
+            // A split window is remembered per screen orientation, for the next session's area.
+            if (isMultiWindowActive() && LabSplitScreen.halfArea(this)) {
                 val longWindow = maxOf(display.windowWidth, display.windowHeight).toFloat()
                 val shortWindow = minOf(display.windowWidth, display.windowHeight).toFloat()
                 if (longWindow > 0 && shortWindow > 0) {
-                    LabSplitScreen.saveSplitWindowFraction(this, size.width / longWindow, size.height / shortWindow)
+                    val portrait = screenPortrait()
+                    if (portrait) LabSplitScreen.saveSplitWindowFraction(this, size.width / shortWindow, size.height / longWindow, true)
+                    else LabSplitScreen.saveSplitWindowFraction(this, size.width / longWindow, size.height / shortWindow, false)
                 }
             }
             videoView?.let { updateVideoLayout(it.width, it.height) }
@@ -4245,13 +4261,15 @@ class CarPlayHostActivity : ComponentActivity() {
         val areas = display.areas ?: return
         if (controller == null || rotationAreaAhead != null) return
         val view = videoView ?: return
-        // The turned screen swaps the window's sides.
-        val target = LabAreas.closest(areas, view.height, view.width) ?: return
+        // The turned screen swaps the window's sides and its orientation.
+        val target = LabAreas.pick(areas, labAreaKinds, view.height, view.width, !screenPortrait(), isMultiWindowActive()) ?: return
         mainHandler.postDelayed({
             val running = controller ?: return@postDelayed
             val nowAreas = sessionDisplay?.areas ?: return@postDelayed
             val now = videoView ?: return@postDelayed
-            if (LabAreas.closest(nowAreas, now.width, now.height) == target) return@postDelayed // already turned
+            if (LabAreas.pick(nowAreas, labAreaKinds, now.width, now.height, screenPortrait(), isMultiWindowActive()) == target) {
+                return@postDelayed // already turned
+            }
             rotationAreaAhead = target
             val sent = running.labViewArea(target, 300, nowAreas.indices.filter { it != target })
             updateVideoLayout(now.width, now.height)
@@ -4259,6 +4277,9 @@ class CarPlayHostActivity : ComponentActivity() {
             appendLog("Lab rotation ahead: view area $target sent=$sent")
         }, LabRotation.leadMillis(this))
     }
+
+    // EXPERIMENT (lab): our Tang's screen is landscape at rotation 0 and turns to portrait at 90/270.
+    private fun screenPortrait(): Boolean = displayRotation() % 2 == 1
 
     // A window much narrower than the session's canvas is the head unit's split screen.
     private fun halfWindow(width: Int, height: Int, display: CarPlaySessionDisplay): Boolean =
@@ -4274,7 +4295,7 @@ class CarPlayHostActivity : ComponentActivity() {
         display.areas?.let { areas ->
             val index = (rotationAreaAhead ?: display.area).coerceIn(0, areas.lastIndex)
             val area = areas[index]
-            val viewArea = LabAreas.closest(areas, viewWidth, viewHeight)
+            val viewArea = LabAreas.pick(areas, labAreaKinds, viewWidth, viewHeight, screenPortrait(), isMultiWindowActive())
             if (rotationAreaAhead != null && viewArea != index) {
                 val scale = minOf(viewWidth.toFloat() / area.width, viewHeight.toFloat() / area.height)
                 return CarPlayVideoLayout((viewWidth - area.width * scale) / 2f, (viewHeight - area.height * scale) / 2f,
