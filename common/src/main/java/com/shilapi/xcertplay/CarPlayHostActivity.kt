@@ -3607,6 +3607,7 @@ class CarPlayHostActivity : ComponentActivity() {
             enhancedSiriProbe = false,
             labSiriPcm16k = com.shilapi.xcertplay.media.SiriMicrophone.pcm16k(this), // EXPERIMENT (lab)
             labMainBuffered = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.mode(this), // EXPERIMENT (lab)
+            labMainBufferedInfo = com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.infoVariant(this), // lab
             limitedUiByGear = com.shilapi.xcertplay.hud.BydOutputSettings.videoWhileParkedActive(this), // EXPERIMENT
         )
     }

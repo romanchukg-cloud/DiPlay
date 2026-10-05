@@ -72,6 +72,17 @@ class LabBufferedAudioProbe internal constructor(private val log: (String) -> Un
         const val MODE_FEATURE = 1
         const val MODE_INFO = 2
         const val MODE_FORMAT = 4
+        const val MODE_SESSION = 8
+        private const val KEY_INFO = "lab_main_buffered_info"
+
+        /** What mainBufferedInfo holds: 0 nothing, 1 bufferSizeMs, 2 audioBufferSize, 3 both. */
+        fun infoVariant(context: Context): Int =
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_INFO, 0)
+
+        fun info(variant: Int): Map<String, Any?> = linkedMapOf<String, Any?>().apply {
+            if (variant and 1 != 0) put("bufferSizeMs", 120_000)
+            if (variant and 2 != 0) put("audioBufferSize", AUDIO_BUFFER_BYTES)
+        }
         private const val DEFAULT_MODE = MODE_INFO
         const val STREAM_TYPE = 103
         const val AUDIO_BUFFER_BYTES = 8 * 1024 * 1024

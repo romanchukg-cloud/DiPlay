@@ -85,4 +85,5 @@ data class AirPlayConfig(
     val labSiriPcm16k: Boolean = false,
     /** EXPERIMENT (lab): offer CarPlay's main buffered audio and log what the iPhone does with it. */
     val labMainBuffered: Int = 0,
+    val labMainBufferedInfo: Int = 0,
 )

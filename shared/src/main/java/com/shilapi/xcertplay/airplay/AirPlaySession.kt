@@ -656,7 +656,9 @@ class AirPlaySession(
             response["keepAlivePort"] = openKeepAlive()
         }
         val features = setupEnabledFeatures(config, dict["features"] as? List<*>)
-        if (config.enhancedSiriProbe) debugLog("airplay SETUP proposed features=${dict["features"]} enabled=$features")
+        if (config.enhancedSiriProbe || config.labMainBuffered != 0) {
+            debugLog("airplay SETUP proposed features=${dict["features"]} enabled=$features")
+        }
         val videoPlaybackEnabled = VideoInCar.FEATURE in features
         val videoDelivery = videoPlaybackAvailability.setFeatureEnabled(videoPlaybackEnabled)
         debugLog("airplay video playback negotiated=$videoPlaybackEnabled availability=$videoDelivery")
@@ -963,6 +965,10 @@ internal fun setupEnabledFeatures(config: AirPlayConfig, proposed: List<*>?): Li
     if (config.cluster != null) features.add("altScreen")
     if (config.videoInCar && proposed.orEmpty().contains(VideoInCar.FEATURE)) features.add(VideoInCar.FEATURE)
     if (config.enhancedSiriProbe && proposed.orEmpty().contains(ENHANCED_SIRI_FEATURE)) features.add(ENHANCED_SIRI_FEATURE)
+    // EXPERIMENT (lab): CarPlaySDK lists "mainBuffered" among the session features the iPhone proposes.
+    if (config.labMainBuffered and LabBufferedAudioProbe.MODE_SESSION != 0 && proposed.orEmpty().contains("mainBuffered")) {
+        features.add("mainBuffered")
+    }
     return features
 }
 

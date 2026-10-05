@@ -82,7 +82,7 @@ object AirPlayInfoPlist {
         }
         if (config.hevc) info["hevcInfo"] = emptyMap<String, Any?>()
         // EXPERIMENT (lab): CarPlay Simulator lists mainBufferedInfo among the /info keys.
-        if (config.labMainBuffered and LabBufferedAudioProbe.MODE_INFO != 0) info["mainBufferedInfo"] = emptyMap<String, Any?>()
+        if (config.labMainBuffered and LabBufferedAudioProbe.MODE_INFO != 0) info["mainBufferedInfo"] = LabBufferedAudioProbe.info(config.labMainBufferedInfo)
         // EXPERIMENT: the key CarPlay Simulator and BYD's own CarPlay pair with the enhancedSiri feature.
         // EXPERIMENT: what may be limited while driving, as CarPlay Simulator lists it (not japanMaps).
         if (config.limitedUiByGear) {
