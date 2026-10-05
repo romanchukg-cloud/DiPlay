@@ -70,11 +70,46 @@ class LabBufferedAudioProbe internal constructor(
         }
     }
 
-    /** The sample the pretended playback has reached, or null before the first frame. */
-    fun playbackSample(nowNs: Long = System.nanoTime()): Long? {
-        val first = firstTimestamp ?: return null
-        val elapsed = maxOf(0.0, (nowNs - firstNs) / 1e9 - PRETEND_LATENCY_MS / 1000.0)
-        return (first + Math.round(elapsed * SAMPLE_RATE)) and 0xffff_ffffL
+    /** The anchor: RTP sample [anchorRtp] plays at [anchorNtp] (NTP64 on the iPhone's synced clock). */
+    @Volatile var anchorRtp: Long? = null
+        private set
+    @Volatile var anchorNtp: java.math.BigInteger? = null
+        private set
+    @Volatile var rate: Int = 0
+        private set
+
+    /** SETRATE: start (rate 1) at [rtpTime] a little after [nowNtp], or pause (rate 0) where playback is. */
+    fun setRate(rtpTime: Long?, newRate: Int, nowNtp: java.math.BigInteger) {
+        if (newRate > 0) {
+            anchorRtp = rtpTime ?: playbackSample(nowNtp) ?: firstTimestamp
+            anchorNtp = nowNtp.add(java.math.BigInteger.valueOf(PRETEND_LATENCY_MS.toLong()).shiftLeft(32)
+                .divide(java.math.BigInteger.valueOf(1000)))
+        } else {
+            playbackSample(nowNtp)?.let { anchorRtp = it }
+            anchorNtp = nowNtp
+        }
+        rate = newRate
+    }
+
+    /** The sample the pretended playback has reached at [nowNtp], or null before an anchor. */
+    fun playbackSample(nowNtp: java.math.BigInteger): Long? {
+        val rtp = anchorRtp ?: return null
+        val at = anchorNtp ?: return null
+        if (rate == 0) return rtp
+        val elapsed = maxOf(0.0, nowNtp.subtract(at).toDouble() / 4294967296.0)
+        return (rtp + Math.round(elapsed * SAMPLE_RATE)) and 0xffff_ffffL
+    }
+
+    /** The anchor as SETRATE and GETANCHOR return it (networkTimeFrac as a 64-bit fraction, as in AirPlay 2). */
+    fun anchorPlist(): Map<String, Any?>? {
+        val rtp = anchorRtp ?: return null
+        val at = anchorNtp ?: return null
+        return linkedMapOf(
+            "rtpTime" to rtp,
+            "networkTimeSecs" to at.shiftRight(32).toLong(),
+            "networkTimeFrac" to at.and(java.math.BigInteger.valueOf(0xffff_ffffL)).shiftLeft(32),
+            "rate" to rate,
+        )
     }
 
     override fun close() {

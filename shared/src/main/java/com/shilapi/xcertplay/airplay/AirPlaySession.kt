@@ -130,11 +130,26 @@ class AirPlaySession(
     }
 
     @Volatile private var labBufferedProbe: LabBufferedAudioProbe? = null // lab
+    private var labAnchorLogs = 0 // lab
+
+    /** EXPERIMENT (lab): SETRATE starts or pauses the buffered stream and returns its anchor; GETANCHOR returns it. */
+    private fun labBufferedRequest(method: String, body: Map<String, Any?>?): RtspMessage.Response? {
+        val probe = labBufferedProbe ?: return null
+        when (method) {
+            "SETRATE" -> probe.setRate(long(body?.get("rtpTime")), long(body?.get("rate"))?.toInt() ?: 1, syncedNtp())
+            "GETANCHOR" -> Unit
+            "FLUSHBUFFERED" -> return RtspMessage.Response(status = 200)
+            else -> return null
+        }
+        val anchor = probe.anchorPlist() ?: return RtspMessage.Response(status = 200)
+        if (method != "GETANCHOR" || labAnchorLogs++ < 3) debugLog("airplay $method anchor=$anchor")
+        return RtspMessage.Response(headers = mapOf("Content-Type" to PLIST_CONTENT_TYPE), body = BplistCodec.encode(anchor))
+    }
 
     /** EXPERIMENT (lab): reports the buffered stream's (pretended) playback position, as for the other audio streams. */
     private fun labBufferedFeedback(body: Map<String, Any?>?): Map<String, Any?>? {
         val probe = labBufferedProbe ?: return body
-        val sample = probe.playbackSample() ?: return body
+        val sample = probe.playbackSample(syncedNtp()) ?: return body
         val nowNs = System.nanoTime()
         val entry = linkedMapOf<String, Any?>(
             "type" to LabBufferedAudioProbe.STREAM_TYPE,
@@ -550,9 +565,10 @@ class AirPlaySession(
         val path = request.path.lowercase()
         // EXPERIMENT (lab): buffered audio is driven by requests DiPlay does not handle (SETRATEANCHORTIME...).
         if (config.labMainBuffered != 0 && request.method !in setOf("GET", "POST", "OPTIONS")) {
-            val decoded = runCatching { BplistCodec.decode(request.body).toString() }.getOrNull()
+            val decoded = runCatching { BplistCodec.decode(request.body) }.getOrNull()
             debugLog("airplay request method=${request.method} path=${request.path} " +
                 "body=${decoded ?: "${request.body.size} bytes"}")
+            labBufferedRequest(request.method, asMap(decoded))?.let { return it }
         }
         return when {
             path.endsWith("/pair-setup") -> RtspMessage.Response(
