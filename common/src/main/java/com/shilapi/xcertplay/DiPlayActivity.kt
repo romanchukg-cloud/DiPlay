@@ -642,6 +642,12 @@ class DiPlayActivity : ComponentActivity() {
                 siriMic.text = siriMicrophoneLabel(SiriMicrophone.cycle(this))
             }
             card.addView(siriMic, matchButton(10, 56))
+            // EXPERIMENT (lab): offer CarPlay's buffered music and log it; reconnects. Music is silent while used.
+            toggle(card, getString(R.string.lab_main_buffered), getString(R.string.lab_main_buffered_description),
+                com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.enabled(this)) {
+                com.shilapi.xcertplay.airplay.LabBufferedAudioProbe.setEnabled(this, it)
+                reconnectForClusterMap()
+            }
             // EXPERIMENT (lab): Siri's microphone timestamps on the iPhone's clock; from the next Siri.
             toggle(card, getString(R.string.lab_siri_input_clock), getString(R.string.lab_siri_input_clock_description),
                 SiriMicrophone.followIphoneClock) { SiriMicrophone.setFollowIphoneClock(this, it) }

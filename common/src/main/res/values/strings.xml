@@ -695,4 +695,6 @@
     <string name="lab_siri_input_pcm16_description">Offers the iPhone only uncompressed 16 kHz mono audio for Siri, instead of Opus 48 kHz. Reconnects CarPlay.</string>
     <string name="lab_siri_input_clock">Lab: Siri microphone on the iPhone\'s clock</string>
     <string name="lab_siri_input_clock_description">Siri\'s microphone packets continue the iPhone\'s timestamps for the stream instead of starting at zero. From the next Siri request.</string>
+    <string name="lab_main_buffered">Lab: buffered music (reconnaissance)</string>
+    <string name="lab_main_buffered_description">Offers the iPhone CarPlay\'s buffered music stream and only logs what it sends; music is silent while the iPhone uses it. Reconnects CarPlay.</string>
 </resources>

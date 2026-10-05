@@ -647,4 +647,6 @@
     <string name="lab_siri_input_pcm16_description">Пропонує iPhone для Siri лише нестиснутий звук 16 кГц моно замість Opus 48 кГц. Перепідключає CarPlay.</string>
     <string name="lab_siri_input_clock">Лаб: мікрофон Siri за годинником iPhone</string>
     <string name="lab_siri_input_clock_description">Пакети мікрофона Siri продовжують мітки часу iPhone для цього потоку замість початку з нуля. З наступного виклику Siri.</string>
+    <string name="lab_main_buffered">Лаб: буферизована музика (розвідка)</string>
+    <string name="lab_main_buffered_description">Пропонує iPhone буферизований музичний потік CarPlay і лише записує в лог, що він шле; поки iPhone ним користується, музики не чути. Перепідключає CarPlay.</string>
 </resources>
