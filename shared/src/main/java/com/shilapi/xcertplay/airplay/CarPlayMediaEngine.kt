@@ -154,7 +154,14 @@ class CarPlayMediaEngine(
                     meta.firstSample = firstSample
                     meta.originNs = System.nanoTime()
                     sink.onAudioStarted(streamId, format, firstSample)
-                    microphone?.let { sink.onMicrophoneStarted(streamId, it) }
+                    microphone?.let {
+                        // EXPERIMENT (lab): Siri's input timestamps continue the iPhone's clock for this stream.
+                        val followClock = it.audioType == "speechrecognition" &&
+                            com.shilapi.xcertplay.media.SiriMicrophone.followIphoneClock
+                        if (it.audioType == "speechrecognition") session.logDebug(
+                            "Siri: downlink firstSample=$firstSample latencyMs=$latencyMs inputFollowsClock=$followClock")
+                        sink.onMicrophoneStarted(streamId, if (followClock) it.copy(firstTimestamp = firstSample) else it)
+                    }
                 }
 
                 override fun onRtp(rtp: ByteArray, sample: Int) =

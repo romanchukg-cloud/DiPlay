@@ -645,4 +645,6 @@
     <string name="lab_siri_microphone_call_no_ns">дзвінок без шумодаву</string>
     <string name="lab_siri_input_pcm16">Лаб: мікрофон Siri як PCM 16 кГц</string>
     <string name="lab_siri_input_pcm16_description">Пропонує iPhone для Siri лише нестиснутий звук 16 кГц моно замість Opus 48 кГц. Перепідключає CarPlay.</string>
+    <string name="lab_siri_input_clock">Лаб: мікрофон Siri за годинником iPhone</string>
+    <string name="lab_siri_input_clock_description">Пакети мікрофона Siri продовжують мітки часу iPhone для цього потоку замість початку з нуля. З наступного виклику Siri.</string>
 </resources>

@@ -693,4 +693,6 @@
     <string name="lab_siri_microphone_call_no_ns">call, no noise suppressor</string>
     <string name="lab_siri_input_pcm16">Lab: Siri microphone as PCM 16 kHz</string>
     <string name="lab_siri_input_pcm16_description">Offers the iPhone only uncompressed 16 kHz mono audio for Siri, instead of Opus 48 kHz. Reconnects CarPlay.</string>
+    <string name="lab_siri_input_clock">Lab: Siri microphone on the iPhone\'s clock</string>
+    <string name="lab_siri_input_clock_description">Siri\'s microphone packets continue the iPhone\'s timestamps for the stream instead of starting at zero. From the next Siri request.</string>
 </resources>

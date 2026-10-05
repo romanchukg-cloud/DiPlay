@@ -14,6 +14,8 @@ data class MicrophoneConfig(
     val key: ByteArray,
     val codec: AudioCodecKind = AudioCodecKind.LPCM,
     val bitrate: Int? = null,
+    /** EXPERIMENT (lab): the first RTP timestamp to send, on the iPhone's clock for this stream. */
+    val firstTimestamp: Int? = null,
 ) {
     val samplesPerPacket: Int
         get() = if (codec == AudioCodecKind.OPUS) {

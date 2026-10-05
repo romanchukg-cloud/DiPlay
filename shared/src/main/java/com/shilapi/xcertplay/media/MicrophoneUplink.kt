@@ -208,7 +208,7 @@ internal class MicrophoneUplink(
     private fun capture(recorder: AudioRecord, socket: DatagramSocket) {
         val frame = ByteArray(config.frameBytes)
         val readBuffer = ByteArray(maxOf(frame.size, MIN_READ_BYTES))
-        val counters = MicrophoneCounters()
+        val counters = MicrophoneCounters(timestamp = config.firstTimestamp ?: 0)
         val routeInfo = { routeType(recorder) }
         var filled = 0
         try {

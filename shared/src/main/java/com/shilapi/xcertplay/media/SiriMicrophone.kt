@@ -35,6 +35,16 @@ object SiriMicrophone {
     private const val PREFS = "diplay"
     private const val KEY = "lab_siri_microphone"
     private const val KEY_PCM16 = "lab_siri_input_pcm16"
+    private const val KEY_CLOCK = "lab_siri_input_clock"
+
+    /** EXPERIMENT (lab): Siri's microphone timestamps start at the iPhone's first timestamp for the stream. */
+    @Volatile var followIphoneClock = true
+        private set
+
+    fun setFollowIphoneClock(context: Context, on: Boolean) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_CLOCK, on).apply()
+        followIphoneClock = on
+    }
 
     /** EXPERIMENT (lab): offer the iPhone only 16 kHz PCM for Siri; applies at the next connection. */
     fun pcm16k(context: Context): Boolean =
@@ -64,6 +74,7 @@ object SiriMicrophone {
 
     fun load(context: Context): Mode {
         recordDir = File(context.filesDir, "mic-lab").apply { mkdirs() }
+        followIphoneClock = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_CLOCK, true)
         val stored = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null)
         mode = Mode.entries.firstOrNull { it.name == stored } ?: Mode.RECOGNITION
         return mode

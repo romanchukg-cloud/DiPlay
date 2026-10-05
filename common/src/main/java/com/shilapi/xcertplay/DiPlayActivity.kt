@@ -642,6 +642,9 @@ class DiPlayActivity : ComponentActivity() {
                 siriMic.text = siriMicrophoneLabel(SiriMicrophone.cycle(this))
             }
             card.addView(siriMic, matchButton(10, 56))
+            // EXPERIMENT (lab): Siri's microphone timestamps on the iPhone's clock; from the next Siri.
+            toggle(card, getString(R.string.lab_siri_input_clock), getString(R.string.lab_siri_input_clock_description),
+                SiriMicrophone.followIphoneClock) { SiriMicrophone.setFollowIphoneClock(this, it) }
             // EXPERIMENT (lab): Siri's microphone as uncompressed 16 kHz PCM; applies on reconnect.
             toggle(card, getString(R.string.lab_siri_input_pcm16), getString(R.string.lab_siri_input_pcm16_description),
                 SiriMicrophone.pcm16k(this)) {
