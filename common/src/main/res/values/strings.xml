@@ -684,4 +684,10 @@
     <string name="lab_siri_microphone_recognition">recognition (default)</string>
     <string name="lab_siri_microphone_gain">recognition +12 dB</string>
     <string name="lab_siri_microphone_call">call (echo cancelling)</string>
+    <string name="lab_byd_siri_output">Lab: Siri voice on the BYD slider: %1$s</string>
+    <string name="lab_byd_navigation_output">Lab: CarPlay navigation prompts on the BYD slider: %1$s</string>
+    <string name="lab_byd_slider_media">Media (default)</string>
+    <string name="lab_byd_slider_call">Call</string>
+    <string name="lab_byd_slider_voice">Voice</string>
+    <string name="lab_byd_slider_navi">Navi</string>
 </resources>

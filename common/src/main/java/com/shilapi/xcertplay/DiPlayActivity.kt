@@ -642,6 +642,18 @@ class DiPlayActivity : ComponentActivity() {
                 siriMic.text = siriMicrophoneLabel(SiriMicrophone.cycle(this))
             }
             card.addView(siriMic, matchButton(10, 56))
+            // EXPERIMENT (lab): which BYD slider Siri and navigation prompts follow; from the next stream.
+            com.shilapi.xcertplay.media.BydAudioChannels.load(this)
+            lateinit var siriOutput: android.widget.Button
+            siriOutput = button(bydSiriLabel(com.shilapi.xcertplay.media.BydAudioChannels.siri), false) {
+                siriOutput.text = bydSiriLabel(com.shilapi.xcertplay.media.BydAudioChannels.cycleSiri(this))
+            }
+            card.addView(siriOutput, matchButton(10, 56))
+            lateinit var navOutput: android.widget.Button
+            navOutput = button(bydNavigationLabel(com.shilapi.xcertplay.media.BydAudioChannels.navigation), false) {
+                navOutput.text = bydNavigationLabel(com.shilapi.xcertplay.media.BydAudioChannels.cycleNavigation(this))
+            }
+            card.addView(navOutput, matchButton(10, 56))
             // EXPERIMENT (lab): what more the iPhone takes from a car; each applies on reconnect.
             for ((probe, title) in listOf(
                 com.shilapi.xcertplay.transport.LabIap2Probes.VEHICLE_EXTRAS to R.string.lab_probe_vehicle_extras,
@@ -3180,6 +3192,19 @@ class DiPlayActivity : ComponentActivity() {
         setPadding(dp(16), 0, dp(16), 0); minHeight = dp(56); stateListAnimator = null
         setOnClickListener { click() }
     }
+    private fun bydSiriLabel(choice: com.shilapi.xcertplay.media.BydAudioChannels.Siri) =
+        getString(R.string.lab_byd_siri_output, getString(when (choice) {
+            com.shilapi.xcertplay.media.BydAudioChannels.Siri.MEDIA -> R.string.lab_byd_slider_media
+            com.shilapi.xcertplay.media.BydAudioChannels.Siri.CALL -> R.string.lab_byd_slider_call
+            com.shilapi.xcertplay.media.BydAudioChannels.Siri.VOICE -> R.string.lab_byd_slider_voice
+        }))
+
+    private fun bydNavigationLabel(choice: com.shilapi.xcertplay.media.BydAudioChannels.Navigation) =
+        getString(R.string.lab_byd_navigation_output, getString(when (choice) {
+            com.shilapi.xcertplay.media.BydAudioChannels.Navigation.MEDIA -> R.string.lab_byd_slider_media
+            com.shilapi.xcertplay.media.BydAudioChannels.Navigation.NAVI -> R.string.lab_byd_slider_navi
+        }))
+
     private fun siriMicrophoneLabel(mode: SiriMicrophone.Mode) = getString(R.string.lab_siri_microphone, getString(when (mode) {
         SiriMicrophone.Mode.RECOGNITION -> R.string.lab_siri_microphone_recognition
         SiriMicrophone.Mode.RECOGNITION_GAIN -> R.string.lab_siri_microphone_gain

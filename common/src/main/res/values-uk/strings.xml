@@ -636,4 +636,10 @@
     <string name="lab_siri_microphone_recognition">розпізнавання (стандарт)</string>
     <string name="lab_siri_microphone_gain">розпізнавання +12 дБ</string>
     <string name="lab_siri_microphone_call">дзвінок (без відлуння)</string>
+    <string name="lab_byd_siri_output">Лаб: голос Siri на повзунку BYD: %1$s</string>
+    <string name="lab_byd_navigation_output">Лаб: підказки навігації CarPlay на повзунку BYD: %1$s</string>
+    <string name="lab_byd_slider_media">Медіа (стандарт)</string>
+    <string name="lab_byd_slider_call">Дзвінок</string>
+    <string name="lab_byd_slider_voice">Voice</string>
+    <string name="lab_byd_slider_navi">Наві</string>
 </resources>

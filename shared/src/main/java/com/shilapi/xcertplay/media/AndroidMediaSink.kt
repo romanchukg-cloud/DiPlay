@@ -1061,6 +1061,7 @@ private class AudioRenderer(
                 Log.w(TAG, "legacy audio stream $streamOverride rejected; keeping usage routing", error)
             }
         }
+        bydLabAttributes(selection.channel)?.let { return it }
         return AudioAttributes.Builder()
             .setUsage(usageFor(selection.channel))
             .setContentType(contentTypeFor(selection.contentType))
@@ -1130,6 +1131,23 @@ private class AudioRenderer(
             (frequencyIndex shl 7) or
             (format.channels.coerceIn(1, 7) shl 3)
         return byteArrayOf((value ushr 8).toByte(), value.toByte())
+    }
+
+    // EXPERIMENT (lab): BYD's own content types put Siri and navigation prompts on their own sliders.
+    private fun bydLabAttributes(channel: AudioChannel): AudioAttributes? {
+        val (usage, contentType) = when {
+            channel == AudioChannel.ASSISTANT && BydAudioChannels.siri == BydAudioChannels.Siri.CALL ->
+                AudioAttributes.USAGE_VOICE_COMMUNICATION to AudioAttributes.CONTENT_TYPE_SPEECH
+            channel == AudioChannel.ASSISTANT && BydAudioChannels.siri == BydAudioChannels.Siri.VOICE ->
+                AudioAttributes.USAGE_MEDIA to BydAudioChannels.CONTENT_TYPE_BTTS
+            channel == AudioChannel.NAVIGATION && BydAudioChannels.navigation == BydAudioChannels.Navigation.NAVI ->
+                AudioAttributes.USAGE_MEDIA to BydAudioChannels.CONTENT_TYPE_NAVI
+            else -> return null
+        }
+        return runCatching {
+            @Suppress("WrongConstant")
+            AudioAttributes.Builder().setUsage(usage).setContentType(contentType).build()
+        }.onFailure { Log.w(TAG, "lab BYD attributes rejected usage=$usage content=$contentType", it) }.getOrNull()
     }
 
     private fun usageFor(channel: AudioChannel): Int = when (channel) {
