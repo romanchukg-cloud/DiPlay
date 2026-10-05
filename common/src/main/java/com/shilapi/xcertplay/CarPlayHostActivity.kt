@@ -1426,8 +1426,8 @@ class CarPlayHostActivity : ComponentActivity() {
     private var labPanelView: View? = null
     private var labPanelSpacer: View? = null
 
-    // Landscape: the panel is the left third; portrait: a band at the bottom third. The spacer is never
-    // clickable, so touches there reach CarPlay.
+    // Landscape: the panel is the right third; portrait: a band at the bottom third (the same edge of the
+    // turning screen). The spacer is never clickable, so touches there reach CarPlay.
     private fun arrangeLabSidePanel(portrait: Boolean, container: LinearLayout? = null) {
         val panel = labPanelView ?: return
         val spacer = labPanelSpacer ?: return
@@ -1436,13 +1436,9 @@ class CarPlayHostActivity : ComponentActivity() {
         row.orientation = if (portrait) LinearLayout.VERTICAL else LinearLayout.HORIZONTAL
         fun params(weight: Float) = if (portrait) LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, weight)
             else LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, weight)
-        if (portrait) {
-            row.addView(spacer, params(2f))
-            row.addView(panel, params(1f))
-        } else {
-            row.addView(panel, params(1f))
-            row.addView(spacer, params(2f))
-        }
+        // The panel is the right third on the landscape screen and the bottom third on the portrait one.
+        row.addView(spacer, params(2f))
+        row.addView(panel, params(1f))
     }
 
     private fun setLabSplit(on: Boolean) {
@@ -3535,10 +3531,10 @@ class CarPlayHostActivity : ComponentActivity() {
                 }
             }
             if (LabSplitScreen.enabled(this)) {
-                // DiPlay's side panel: CarPlay on the right two thirds of the landscape screen.
+                // DiPlay's side panel on the right: CarPlay on the left two thirds of the landscape screen, so the
+                // panel stays on the same edge of the glass as the portrait screen's bottom band.
                 val landscape = areas[0]
-                val left = landscape.width / 3
-                add(LabAreas.Kind.SIDE_PANEL, landscape.width - (left and 1.inv()), landscape.height, left)
+                add(LabAreas.Kind.SIDE_PANEL, landscape.width * 2 / 3, landscape.height)
                 if (rotationAreas) {
                     // On the portrait screen the panel is a band at the bottom, as BYD's own portrait layout.
                     val portraitArea = areas[1]
