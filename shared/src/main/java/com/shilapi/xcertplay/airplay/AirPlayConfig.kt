@@ -51,7 +51,16 @@ data class AirPlayDisplayConfig(
     val labHalfAreaHeightPixels: Int? = null,
     /** EXPERIMENT (lab): the rotation area to start in (0 landscape, 1 portrait). */
     val labRotationInitialArea: Int = 0,
+    /**
+     * EXPERIMENT (lab): view areas anchored at the canvas's top-left (width x height each), for rotation
+     * and the head unit's split screen in one session; the car picks one with updateViewArea.
+     */
+    val labAreas: List<AirPlayAreaSize>? = null,
+    val labInitialArea: Int = 0,
 )
+
+/** EXPERIMENT (lab): a view area's size; it starts at the canvas's top-left corner. */
+data class AirPlayAreaSize(val width: Int, val height: Int)
 
 /** One OEM homescreen icon. */
 data class AirPlayIcon(
