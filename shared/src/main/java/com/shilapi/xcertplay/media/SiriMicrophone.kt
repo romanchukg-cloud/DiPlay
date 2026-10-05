@@ -34,6 +34,14 @@ object SiriMicrophone {
     const val GAIN = 4
     private const val PREFS = "diplay"
     private const val KEY = "lab_siri_microphone"
+    private const val KEY_PCM16 = "lab_siri_input_pcm16"
+
+    /** EXPERIMENT (lab): offer the iPhone only 16 kHz PCM for Siri; applies at the next connection. */
+    fun pcm16k(context: Context): Boolean =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_PCM16, false)
+
+    fun setPcm16k(context: Context, on: Boolean) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_PCM16, on).apply()
 
     @Volatile var mode = Mode.RECOGNITION
         private set

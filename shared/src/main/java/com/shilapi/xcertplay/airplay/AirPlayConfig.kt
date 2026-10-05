@@ -81,4 +81,6 @@ data class AirPlayConfig(
      * so the iPhone knows when the car is parked. Without it the iPhone treats the car as always moving.
      */
     val limitedUiByGear: Boolean = false,
+    /** EXPERIMENT (lab): offer only uncompressed 16 kHz mono PCM for Siri's microphone. */
+    val labSiriPcm16k: Boolean = false,
 )

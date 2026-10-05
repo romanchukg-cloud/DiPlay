@@ -691,4 +691,6 @@
     <string name="lab_byd_slider_voice">Voice</string>
     <string name="lab_byd_slider_navi">Navi</string>
     <string name="lab_siri_microphone_call_no_ns">call, no noise suppressor</string>
+    <string name="lab_siri_input_pcm16">Lab: Siri microphone as PCM 16 kHz</string>
+    <string name="lab_siri_input_pcm16_description">Offers the iPhone only uncompressed 16 kHz mono audio for Siri, instead of Opus 48 kHz. Reconnects CarPlay.</string>
 </resources>

@@ -643,4 +643,6 @@
     <string name="lab_byd_slider_voice">Voice</string>
     <string name="lab_byd_slider_navi">Наві</string>
     <string name="lab_siri_microphone_call_no_ns">дзвінок без шумодаву</string>
+    <string name="lab_siri_input_pcm16">Лаб: мікрофон Siri як PCM 16 кГц</string>
+    <string name="lab_siri_input_pcm16_description">Пропонує iPhone для Siri лише нестиснутий звук 16 кГц моно замість Opus 48 кГц. Перепідключає CarPlay.</string>
 </resources>

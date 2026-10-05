@@ -18,6 +18,7 @@ object AirPlayInfoPlist {
     private const val CARPLAY_AUDIO_FEATURES = 0x10004540a00L
     private val CARPLAY_FEATURES_NO_AUDIO = CARPLAY_FEATURES and CARPLAY_AUDIO_FEATURES.inv()
 
+    private const val PCM_16K_MONO = 0x10
     private const val RESOURCE_SCREEN = 1
     private const val RESOURCE_AUDIO = 2
     private const val TRANSFER_TAKE = 1
@@ -50,7 +51,7 @@ object AirPlayInfoPlist {
         )
         if (!config.disableAudioOutput) {
             info["audioLatencies"] = audioLatencies()
-            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone)
+            info["audioFormats"] = audioFormats(config.entertainmentSampleRate, config.microphone, config.labSiriPcm16k)
         }
         info["extendedFeatures"] = listOf("vocoderInfo", "enhancedRequestCarUI")
         info["displays"] = displays
@@ -125,6 +126,7 @@ object AirPlayInfoPlist {
     private fun audioFormats(
         entertainmentRate: Int,
         microphone: Boolean,
+        siriPcm16k: Boolean = false,
     ): List<Map<String, Any?>> {
         fun format(type: Int, audioType: String, outputFormats: Int, inputFormats: Int? = null): Map<String, Any?> {
             val entry = linkedMapOf<String, Any?>(
@@ -144,6 +146,8 @@ object AirPlayInfoPlist {
         val aacLc = if (is48) 0x800000 else 0x400000
         val pcmInput = if (microphone) pcmMono else null
         val wirelessInput = if (microphone) pcmMono or opus else null
+        // EXPERIMENT (lab): PCM 16 kHz mono only, so the iPhone cannot pick Opus for Siri.
+        val siriInput = if (microphone && siriPcm16k) PCM_16K_MONO else wirelessInput
 
         return listOf(
             format(100, "compatibility", pcm, pcmInput),
@@ -152,7 +156,7 @@ object AirPlayInfoPlist {
             format(100, "alert", pcm or opus),
             format(100, "media", pcm),
             format(100, "telephony", pcmMono or opus, wirelessInput),
-            format(100, "speechRecognition", pcmMono or opus, wirelessInput),
+            format(100, "speechRecognition", pcmMono or opus, siriInput),
             format(101, "default", pcm or opus),
             format(102, "media", aacLc),
         )
