@@ -185,7 +185,9 @@ object AirPlayInfoPlist {
         entry["viewAreas"] = if (display.labHalfAreaPixels != null) {
             // EXPERIMENT (lab): the whole screen, and its left part as wide as a split-screen window.
             val gap = display.widthPixels - display.labHalfAreaPixels
-            listOf(areaDict(display), areaDict(display.copy(viewArea = AirPlayInsets(right = gap), safeArea = AirPlayInsets(right = gap))))
+            val below = display.heightPixels - (display.labHalfAreaHeightPixels ?: display.heightPixels)
+            val half = AirPlayInsets(right = gap, bottom = below)
+            listOf(areaDict(display), areaDict(display.copy(viewArea = half, safeArea = half)))
         } else if (display.labRotationShortSide != null) {
             // EXPERIMENT (lab): landscape (top) and portrait (left) inside one square stream.
             val gap = display.widthPixels - display.labRotationShortSide

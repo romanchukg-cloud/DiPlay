@@ -32,6 +32,18 @@ object LabSplitScreen {
     fun halfArea(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("half_area", false)
 
+    /** The split-screen window last seen, as fractions of the full window (width, height), or null. */
+    fun splitWindowFraction(context: Context): Pair<Float, Float>? {
+        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val w = prefs.getFloat("split_window_w", 0f)
+        val h = prefs.getFloat("split_window_h", 0f)
+        return if (w > 0f && h > 0f) w to h else null
+    }
+
+    fun saveSplitWindowFraction(context: Context, width: Float, height: Float) =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putFloat("split_window_w", width).putFloat("split_window_h", height).apply()
+
     /** EXPERIMENT: a square stream with landscape and portrait areas (see labRotationShortSide). */
     fun rotationAreas(context: Context): Boolean =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("rotation_areas", false)

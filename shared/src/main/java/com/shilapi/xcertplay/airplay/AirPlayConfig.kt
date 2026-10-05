@@ -47,6 +47,8 @@ data class AirPlayDisplayConfig(
      * (DiPlay's window then covers half the screen); the car switches to it without reconnecting.
      */
     val labHalfAreaPixels: Int? = null,
+    /** EXPERIMENT (lab): the split-screen area's height; null = the whole height. */
+    val labHalfAreaHeightPixels: Int? = null,
     /** EXPERIMENT (lab): the rotation area to start in (0 landscape, 1 portrait). */
     val labRotationInitialArea: Int = 0,
 )
