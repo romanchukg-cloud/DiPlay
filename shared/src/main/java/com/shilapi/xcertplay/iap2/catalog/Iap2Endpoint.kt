@@ -42,7 +42,13 @@ data class Iap2FieldSpec(
     val required: Boolean = false,
     val repeatable: Boolean = false,
     val children: List<Iap2FieldSpec> = emptyList(),
-)
+    /** Credentials and positions: the trace shows only the byte count, never the value. */
+    val sensitive: Boolean = false,
+) {
+    /** True when this field or any nested field is [sensitive]. */
+    val containsSensitive: Boolean
+        get() = sensitive || children.any { it.containsSensitive }
+}
 
 /**
  * Metadata for one CSM endpoint.
@@ -58,7 +64,11 @@ data class Iap2Endpoint(
     val direction: Iap2Direction,
     val confidence: Iap2Confidence = Iap2Confidence.HIGH,
     val fields: List<Iap2FieldSpec> = emptyList(),
-)
+) {
+    /** True when a frame of this endpoint may carry a credential or position somewhere in its body. */
+    val containsSensitive: Boolean
+        get() = fields.any { it.containsSensitive }
+}
 
 /**
  * The endpoint registry from IAP2_ENDPOINT_BODY_REFERENCE.zh-CN.md.
@@ -308,7 +318,7 @@ object Iap2Endpoints {
                 Iap2WireType.GROUP,
                 children = listOf(
                     field(0, "SSID", Iap2WireType.STRING),
-                    field(1, "passphrase", Iap2WireType.STRING),
+                    field(1, "passphrase", Iap2WireType.STRING, sensitive = true),
                     field(2, "channel", Iap2WireType.U8),
                     field(3, "wirelessIP", Iap2WireType.STRING, repeatable = true),
                     field(4, "securityType", Iap2WireType.U8),
@@ -359,7 +369,7 @@ object Iap2Endpoints {
             field(0, "status", Iap2WireType.U8, required = true),
             field(1, "securityType", Iap2WireType.U8),
             field(2, "SSID", Iap2WireType.STRING),
-            field(3, "passphrase", Iap2WireType.STRING),
+            field(3, "passphrase", Iap2WireType.STRING, sensitive = true),
         ),
     )
     val REQUEST_ACCESSORY_WIFI_CONFIGURATION = endpoint(
@@ -376,7 +386,7 @@ object Iap2Endpoints {
         fields = listOf(
             field(0, "BSSID", Iap2WireType.BYTES),
             field(1, "SSID", Iap2WireType.STRING),
-            field(2, "passphrase", Iap2WireType.STRING),
+            field(2, "passphrase", Iap2WireType.STRING, sensitive = true),
             field(3, "securityType", Iap2WireType.U8),
             field(4, "channel", Iap2WireType.U8),
         ),
@@ -399,7 +409,7 @@ object Iap2Endpoints {
         "LocationInformation",
         "Location",
         Iap2Direction.ACCESSORY_TO_IPHONE,
-        fields = listOf(field(0, "NMEA", Iap2WireType.STRING)),
+        fields = listOf(field(0, "NMEA", Iap2WireType.STRING, sensitive = true)),
     )
     val STOP_LOCATION_INFORMATION = endpoint(
         0xfffc,
@@ -928,5 +938,6 @@ object Iap2Endpoints {
         required: Boolean = false,
         repeatable: Boolean = false,
         children: List<Iap2FieldSpec> = emptyList(),
-    ): Iap2FieldSpec = Iap2FieldSpec(id, name, type, required, repeatable, children)
+        sensitive: Boolean = false,
+    ): Iap2FieldSpec = Iap2FieldSpec(id, name, type, required, repeatable, children, sensitive)
 }

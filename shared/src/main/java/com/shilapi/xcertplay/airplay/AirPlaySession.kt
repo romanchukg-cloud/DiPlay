@@ -1,6 +1,7 @@
 package com.shilapi.xcertplay.airplay
 
 import android.util.Log
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.mfi.MfiAuthenticator
 import com.shilapi.xcertplay.transport.BlockingDuplexByteStream
 import java.io.BufferedInputStream
@@ -128,7 +129,7 @@ class AirPlaySession(
         if (!closed.get()) listener.onVideoFrameRendered(this)
     }
 
-    internal fun logTrace(message: String) = trace(message)
+    internal fun logTrace(message: String) = trace { message }
 
     fun start() {
         Thread(::runControl, "airplay-control").apply {
@@ -316,7 +317,7 @@ class AirPlaySession(
             "Content-Type: $PLIST_CONTENT_TYPE\r\n" +
             "Content-Length: ${body.size}\r\n" +
             "CSeq: $eventCseq\r\n\r\n"
-        trace("airplay event tx headers=$head bodyHex=${body.toHex()}")
+        trace { "airplay event tx headers=$head ${traceBody(body)}" }
         return try {
             val bytes = cipher.encrypt(head.toByteArray(Charsets.US_ASCII) + body)
             val output = socket.getOutputStream()
@@ -477,10 +478,7 @@ class AirPlaySession(
                         AirPlayControlDiagnostics.request(request.method, request.path, request.body.size),
                         false,
                     )
-                    trace(
-                        "airplay control rx headers=${request.headers} " +
-                            "bodyHex=${request.body.toHex()}",
-                    )
+                    trace { "airplay control rx headers=${request.headers} ${traceBody(request.body)}" }
                     val response = try {
                         handle(request)
                     } catch (error: Exception) {
@@ -500,7 +498,7 @@ class AirPlaySession(
                         false,
                     )
                     val wire = RtspMessage.buildResponse(request, response)
-                    trace("airplay control tx wireHex=${wire.toHex()}")
+                    trace { "airplay control tx wireHex=${wire.toHex()}" }
                     output.write(cipher?.encrypt(wire) ?: wire)
                     if (cipher == null && pairVerify.controlKeys != null) {
                         val keys = pairVerify.controlKeys!!
@@ -609,9 +607,15 @@ class AirPlaySession(
         reapplyClusterContent()
     }
 
+    /**
+     * UI-visible lines are written to logcat by the listener (the controller), which also redacts
+     * them; only lines kept away from the UI are logged here.
+     */
     private fun debugLog(message: String, uiVisible: Boolean = true) {
-        Log.i(TAG, message)
-        if (!uiVisible) return
+        if (!uiVisible) {
+            DiagnosticLogging.info(message, TAG)
+            return
+        }
         try {
             listener.onDebugLog(message)
         } catch (error: Exception) {
@@ -619,9 +623,14 @@ class AirPlaySession(
         }
     }
 
-    private fun trace(message: String) {
+    /**
+     * Protocol traces carry decrypted headers and bodies. They are built and delivered only after a
+     * developer opted in with the VERBOSE log tag; see [DiagnosticLogging].
+     */
+    private inline fun trace(message: () -> String) {
+        if (!DiagnosticLogging.traceEnabled) return
         try {
-            listener.onDebugLog("TRACE $message")
+            listener.onDebugLog(TRACE_PREFIX + message())
         } catch (error: Exception) {
             Log.w(TAG, "trace log callback failed", error)
         }
@@ -640,7 +649,7 @@ class AirPlaySession(
             val responseStreams = handleStreams(streams)
             debugLog("airplay SETUP response streams=$responseStreams")
             val body = BplistCodec.encode(linkedMapOf("streams" to responseStreams))
-            trace("airplay SETUP response bplistHex=${body.toHex()}")
+            trace { "airplay SETUP response bplistHex=${body.toHex()}" }
             return RtspMessage.Response(headers = mapOf("Content-Type" to PLIST_CONTENT_TYPE), body = body)
         }
 
@@ -765,7 +774,7 @@ class AirPlaySession(
             "airplay TEARDOWN types=${types ?: "all"} activeBefore=$activeStreams " +
                 "body=${request.body.size} bytes payload=$decodedBody",
         )
-        trace("airplay TEARDOWN raw${request.body.size}Hex=${request.body.toHex()}")
+        trace { "airplay TEARDOWN raw${request.body.size}Hex=${request.body.toHex()}" }
 
         // Restore wheel input before releasing media resources, which may take time to close.
         if (types == null || STREAM_TYPE_MAIN_SCREEN in types) mainScreenToken = null
@@ -905,11 +914,8 @@ class AirPlaySession(
                         "airplay event rx ${message.method} ${message.path} cseq=${message.headers["cseq"] ?: "-"} body=${message.body.size}",
                     )
                     val response = RtspMessage.buildResponse(message, RtspMessage.Response(status = 200))
-                    trace(
-                        "airplay event rx headers=${message.headers} " +
-                            "bodyHex=${message.body.toHex()}",
-                    )
-                    trace("airplay event tx wireHex=${response.toHex()}")
+                    trace { "airplay event rx headers=${message.headers} ${traceBody(message.body)}" }
+                    trace { "airplay event tx wireHex=${response.toHex()}" }
                     synchronized(eventWriteLock) {
                         output.write(cipher.encrypt(response))
                         output.flush()
@@ -934,8 +940,10 @@ class AirPlaySession(
         thread.start()
     }
 
-    private companion object {
+    internal companion object {
         const val TAG = "xcertplay-usb"
+        /** Marks listener lines that hold protocol payloads; the host and the redactor key on it. */
+        const val TRACE_PREFIX = "TRACE "
         const val PLIST_CONTENT_TYPE = "application/x-apple-binary-plist"
         const val PAIRING_CONTENT_TYPE = "application/pairing+tlv8"
         const val OCTET_CONTENT_TYPE = "application/octet-stream"
@@ -994,6 +1002,19 @@ internal fun safeClose(closeable: Closeable?) {
         // Best-effort close.
     }
 }
+
+/**
+ * A trace's view of a command body. Bodies that carry iAP2 packets (location, calls, now playing,
+ * credentials) are left out even from traces; the iAP2 frame trace shows those frames with their
+ * sensitive fields withheld.
+ */
+internal fun traceBody(body: ByteArray): String =
+    if (carriesIap2Packet(body)) "body=${body.size}B withheld (iAP2 data; see the IAP2 frame trace)"
+    else "bodyHex=${body.toHex()}"
+
+/** True when [bytes] contain an iAP2 link packet's start marker (0xFF 0x5A). */
+internal fun carriesIap2Packet(bytes: ByteArray): Boolean =
+    (0 until bytes.size - 1).any { (bytes[it].toInt() and 0xff) == 0xff && (bytes[it + 1].toInt() and 0xff) == 0x5a }
 
 private fun ByteArray.toHex(): String =
     joinToString(separator = "") { byte -> "%02x".format(byte.toInt() and 0xff) }

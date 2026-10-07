@@ -108,6 +108,7 @@ import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.roundToInt
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 /**
  * Full-screen CarPlay host. It renders decoded video through a [TextureView], forwards touch to

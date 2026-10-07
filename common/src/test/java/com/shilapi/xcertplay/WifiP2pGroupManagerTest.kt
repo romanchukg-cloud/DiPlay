@@ -26,6 +26,7 @@ import java.net.InetAddress
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [32], manifest = Config.NONE,

@@ -1,3 +1,7 @@
+# Unreleased
+
+- Keep credentials and personal data out of logcat. Connection logs are redacted like exported reports, and exception messages (which can name the iPhone, its Bluetooth address or the hotspot) are reduced to their classes. iAP2 frame dumps, AirPlay bodies, USBMUX frame headers, route guidance text and the wired iPhone syslog capture are written only after a developer opts in with `adb shell setprop log.tag.xcertplay-usb VERBOSE`. Even then, iAP2 frames withhold Wi-Fi passphrases and NMEA positions, and AirPlay bodies that carry iAP2 data are not dumped.
+
 # DiPlay 0.2.13 — 2026-10-06
 
 - Enable the legacy Android 9 Wi-Fi Direct group path with generated credentials and serialized ownership/cleanup; requested frequency remains unverified on Android 9 (#282).

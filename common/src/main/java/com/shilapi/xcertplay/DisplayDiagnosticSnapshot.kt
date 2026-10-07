@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 /** Small, redacted snapshot retained separately from the rotating session logs. */
 internal object DisplayDiagnosticSnapshot {

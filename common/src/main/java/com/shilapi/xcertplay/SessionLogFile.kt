@@ -2,6 +2,7 @@ package com.shilapi.xcertplay
 
 import java.io.Closeable
 import java.io.File
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 /** Bounded, private diagnostics. Each write is redacted before touching storage. */
 internal class SessionLogFile(val file: File) : Closeable {
