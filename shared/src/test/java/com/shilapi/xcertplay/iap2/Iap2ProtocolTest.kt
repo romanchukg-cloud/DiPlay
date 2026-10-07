@@ -15,6 +15,7 @@ import com.shilapi.xcertplay.iap2.wire.Iap2Frame
 import com.shilapi.xcertplay.iap2.wire.Iap2Parameter
 import com.shilapi.xcertplay.iap2.wire.Iap2ParameterList
 import com.shilapi.xcertplay.iap2.wire.Iap2ProtocolException
+import com.shilapi.xcertplay.iap2.wire.Iap2WireCodec
 import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -180,10 +181,65 @@ class Iap2ProtocolTest {
     }
 
     @Test
-    fun formatterEscapesLineBreaksInNmeaStrings() {
-        val frame = Iap2ControlMessages.locationInformation("\$GPGGA,1\r\n")
+    fun formatterEscapesLineBreaksInStrings() {
+        val name = "Car\r\nName"
+        val body = Iap2ParameterList.of(Iap2Parameter(0, Iap2WireCodec.string(name))).encode()
+        val frame = Iap2Frame(Iap2Endpoints.IDENTIFICATION_INFORMATION.id, body)
         val formatted = Iap2FrameFormatter.format(Iap2TraceDirection.TX, "wired", frame)
 
-        assertTrue(formatted.contains("\\r\\n"))
+        assertTrue(formatted.contains("name: \"Car\\r\\nName\""))
+    }
+
+    @Test
+    fun formatterWithholdsNmeaPositions() {
+        val sentence = "\$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M\r\n"
+        val frame = Iap2ControlMessages.locationInformation(sentence)
+        val formatted = Iap2FrameFormatter.format(Iap2TraceDirection.TX, "wired", frame)
+
+        assertTrue(formatted.startsWith("IAP2 TX [wired] 0xfffb LocationInformation"))
+        assertTrue(formatted.contains("NMEA: <redacted ${sentence.length + 1}B>"))
+        assertTrue(formatted.contains("raw-body=<redacted "))
+        assertFalse(formatted.contains("4807"))
+        assertFalse(formatted.contains("GPGGA"))
+    }
+
+    @Test
+    fun formatterWithholdsWiFiPassphrasesAndTheirRawBytes() {
+        val frame = Iap2WirelessMessages.accessoryWiFiConfiguration(
+            ssid = "LIVI",
+            passphrase = "hunter2-secret",
+            channel = 36,
+            securityType = 3,
+            bssid = null,
+        )
+        val formatted = Iap2FrameFormatter.format(Iap2TraceDirection.TX, "wireless", frame)
+
+        assertTrue(formatted.contains("SSID: \"LIVI\""))
+        assertTrue(formatted.contains("passphrase: <redacted 15B>"))
+        assertTrue(formatted.contains("raw-body=<redacted "))
+        assertFalse(formatted.contains("hunter2"))
+        assertFalse(formatted.contains("68 75 6e"))
+    }
+
+    @Test
+    fun startSessionTraceWithholdsTheWirelessPassphraseInsideTheGroup() {
+        val frame = Iap2CarPlayMessages.startSession(
+            airPlayPort = 7000,
+            publicKey = "pub",
+            sourceVersion = "1.0",
+            wireless = Iap2WirelessSessionParameters(
+                ssid = "LIVI",
+                passphrase = "hunter2-secret",
+                channel = 36,
+                ipAddresses = listOf("fe80::1"),
+                securityType = 3,
+            ),
+        )
+        val formatted = Iap2FrameFormatter.format(Iap2TraceDirection.TX, "wireless", frame)
+
+        assertTrue(formatted.startsWith("IAP2 TX [wireless] 0x4301 CarPlayStartSession"))
+        assertTrue(formatted.contains("passphrase: <redacted 15B>"))
+        assertTrue(formatted.contains("raw-body=<redacted "))
+        assertFalse(formatted.contains("hunter2"))
     }
 }

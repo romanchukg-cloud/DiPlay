@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -117,7 +118,8 @@ internal object BydClusterBridge {
             applyClusterModeLocked()
             if (!guidanceLogged) {
                 guidanceLogged = true
-                Log.i(TAG, "cluster guidance sent $frame")
+                Log.i(TAG, "cluster guidance sent")
+                DiagnosticLogging.trace(TAG) { "cluster guidance $frame" }
             }
         }
     }

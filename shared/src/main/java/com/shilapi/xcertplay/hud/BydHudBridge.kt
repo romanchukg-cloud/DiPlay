@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.hud
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -86,7 +87,9 @@ internal object BydHudBridge {
         if (frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_UPDATE ||
             frame.messageId == BydHudRouteState.ROUTE_GUIDANCE_MANEUVER_UPDATE
         ) {
-            Log.d(TAG, "route frame=0x${frame.messageId.toString(16)} change=$change guidance=${route.current()}")
+            // Road names, distances and arrival times stay out of ordinary logs.
+            Log.d(TAG, "route frame=0x${frame.messageId.toString(16)} change=$change")
+            DiagnosticLogging.trace(TAG) { "route guidance=${route.current()}" }
         }
         when (change) {
             BydHudRouteChange.GUIDANCE -> sendCurrentLocked()

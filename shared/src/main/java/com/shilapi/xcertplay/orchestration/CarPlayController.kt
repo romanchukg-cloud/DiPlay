@@ -34,6 +34,7 @@ import com.shilapi.xcertplay.airplay.AirPlaySessionListener
 import com.shilapi.xcertplay.airplay.PairingStore
 import com.shilapi.xcertplay.airplay.VideoInCar
 import com.shilapi.xcertplay.airplay.VideoPlaybackDelivery
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import com.shilapi.xcertplay.hud.BydNavigationOutputs
 import com.shilapi.xcertplay.iap2.session.Iap2Session
 import com.shilapi.xcertplay.mfi.Iap2MfiAuthenticationClient
@@ -380,7 +381,7 @@ class CarPlayController(
         }
 
         override fun onDebugLog(message: String) {
-            debugLog(message)
+            if (message.startsWith(AirPlaySession.TRACE_PREFIX)) traceLog(message) else debugLog(message)
         }
     }
 
@@ -794,7 +795,7 @@ class CarPlayController(
                 }
                 if (closed || phase != Phase.MFI) return@execute
                 mfiSession = MfiSession(client, null)
-                debugLog("mfi local offline ready protocolMajor=${client.protocolMajor()} certificateBytes=${client.readCertificate().size}")
+                debugLog("mfi local offline ready protocolMajor=${client.protocolMajor()} mfiCertBytes=${client.readCertificate().size}")
                 onStatus(CarPlayStatus.MfiReady)
                 startPhone()
             } catch (error: Throwable) {
@@ -991,8 +992,8 @@ class CarPlayController(
             return "deviceVersion=" + hex(deviceVersion) +
                 " firmwareVersion=" + hex(firmwareVersion) +
                 " protocolMajor=" + hex(protocolMajor) +
-                " accessoryCertificateLength=" + accessoryCertificateLength +
-                " appleCertificateLength=" + appleCertificateLength
+                " accessoryCertLength=" + accessoryCertificateLength +
+                " appleCertLength=" + appleCertificateLength
         }
 
         private fun hex(value: Int?): String =
@@ -1044,7 +1045,7 @@ class CarPlayController(
         } ?: return client
         debugLog(
             "mfi address override: 0x" + client.address7Bit.toString(16) +
-                " has no accessory certificate; using 0x" + alternative.key.toString(16),
+                " has no accessory cert; using 0x" + alternative.key.toString(16),
         )
         return MfiAuthenticationClient(transport, alternative.key)
     }
@@ -1325,7 +1326,9 @@ class CarPlayController(
             val channel = Iap2Session.openWireless(
                 stream,
                 traceContext = "wireless-rfcomm",
-                onTrace = ::debugLog,
+                onTrace = ::traceLog,
+                onState = ::debugLog,
+                traceFrames = DiagnosticLogging.traceEnabled,
                 onArtwork = ::onArtworkTransfer,
             )
             synchronized(wirelessResourceLock) {
@@ -1452,7 +1455,9 @@ class CarPlayController(
             Iap2Session.openTunnel(
                 stream,
                 traceContext = "wireless-tunnel",
-                onTrace = ::debugLog,
+                onTrace = ::traceLog,
+                onState = ::debugLog,
+                traceFrames = DiagnosticLogging.traceEnabled,
                 onArtwork = ::onArtworkTransfer,
             )
         } catch (error: Throwable) {
@@ -1883,15 +1888,16 @@ class CarPlayController(
             var pairRecord = savedPairRecord ?: pairNewRecord(pairingClient)
             debugLog(
                 if (savedPairRecord != null) {
-                    "wired using saved Lockdown pair record"
+                    "wired using the saved Lockdown pairing"
                 } else {
-                    "wired created a new Lockdown pair record"
+                    "wired created a new Lockdown pairing"
                 },
             )
             onStatus(CarPlayStatus.ConnectingControl)
             val carKitClient = LockdownCarKitClient(mux)
-            // Temporary lab capture, limited to accessory/authentication messages and two minutes.
-            try {
+            // Temporary lab capture, limited to accessory/authentication messages and two minutes. Phone
+            // log lines are private, so they reach logcat only as traces, after a developer opted in.
+            if (DiagnosticLogging.traceEnabled) try {
                 val relay = carKitClient.openService(pairRecord, config.label, "com.apple.syslog_relay")
                 Thread({
                     try {
@@ -1908,7 +1914,7 @@ class CarPlayController(
                                     if (end < 0) break
                                     val line = pending.substring(0, end)
                                     pending.delete(0, end + 1)
-                                    if (relevant.containsMatchIn(line)) debugLog("PHONE ${line.take(2000)}")
+                                    if (relevant.containsMatchIn(line)) traceLog("PHONE ${line.take(2000)}")
                                 }
                                 if (pending.length > 65536) pending.clear()
                             }
@@ -1920,68 +1926,28 @@ class CarPlayController(
                 }, "carplay-lab-phone-diagnostics").apply { isDaemon = true; start() }
                 debugLog("phone authentication diagnostic capture started")
             } catch (error: Exception) {
-                debugLog("phone authentication diagnostics unavailable: ${error.message}")
+                debugLog("phone authentication diagnostics unavailable: ${error.javaClass.simpleName}")
             }
             val carkit = try {
                 carKitClient.open(pairRecord, config.label)
             } catch (error: Throwable) {
                 val rejection = rejectedPairRecordError(error)
                 if (savedPairRecord == null || rejection == null) throw error
-                debugLog("saved Lockdown pair record rejected by Lockdown error=$rejection; clearing and pairing again")
+                debugLog("saved Lockdown pairing rejected by Lockdown error=$rejection; clearing and pairing again")
                 clearPairRecord()
                 pairRecord = pairNewRecord(pairingClient)
                 carKitClient.open(pairRecord, config.label)
             }
             debugLog("wired com.apple.carkit.service stream opened")
-            // Lab transport diagnostics: packet headers only, never certificate or challenge data.
-            fun wireSummary(bytes: ByteArray): String {
-                if (bytes.size < 9 || bytes[0].toInt() and 0xff != 0xff ||
-                    bytes[1].toInt() and 0xff != 0x5a) return "bytes=${bytes.size}"
-                fun value(index: Int) = bytes[index].toInt() and 0xff
-                return "bytes=${bytes.size} length=${(value(2) shl 8) or value(3)} " +
-                    "flags=${value(4)} seq=${value(5)} ack=${value(6)} session=${value(7)}"
-            }
-            val tracedCarkit = object : com.shilapi.xcertplay.transport.BlockingDuplexByteStream {
-                private val io = ConnectionIoDiagnostics(::connectionDiagnostic)
-                override fun send(data: ByteArray) {
-                    val started = System.nanoTime()
-                    var result = ConnectionIoDiagnostics.Result.FAILED
-                    try {
-                        debugLog("wired link TX begin ${wireSummary(data)}")
-                        // Bound each TLS write while diagnosing the stalled certificate transfer.
-                        for (offset in data.indices step 256) {
-                            carkit.send(data.copyOfRange(offset, minOf(offset + 256, data.size)))
-                        }
-                        debugLog("wired link TX completed bytes=${data.size}")
-                        result = ConnectionIoDiagnostics.Result.COMPLETED
-                    } finally {
-                        io.record(ConnectionIoDiagnostics.Operation.WRITE, result, elapsedMillis(started))
-                    }
-                }
-                override fun recv(maxBytes: Int, timeoutMillis: Long): ByteArray? {
-                    val started = System.nanoTime()
-                    var result = ConnectionIoDiagnostics.Result.FAILED
-                    try {
-                        return carkit.recv(maxBytes, timeoutMillis).also { bytes ->
-                            result = when {
-                                bytes == null -> ConnectionIoDiagnostics.Result.TIMED_OUT
-                                bytes.isEmpty() -> ConnectionIoDiagnostics.Result.ENDED
-                                else -> ConnectionIoDiagnostics.Result.COMPLETED
-                            }
-                            if (bytes != null) debugLog("wired link RX ${wireSummary(bytes)}")
-                        }
-                    } finally {
-                        io.record(ConnectionIoDiagnostics.Operation.READ, result, elapsedMillis(started))
-                    }
-                }
-                override fun close() {
-                    try { carkit.close() } finally { io.finish() }
-                }
-            }
             val csm = Iap2Session.open(
-                tracedCarkit,
+                // Lab transport diagnostics: packet headers only; each TLS write stays bounded to 256 bytes
+                // while the stalled certificate transfer is diagnosed.
+                DiagnosedDuplexStream(carkit, ConnectionIoDiagnostics(::connectionDiagnostic),
+                    maxWriteBytes = 256, wireLog = ::debugLog),
                 traceContext = "wired",
-                onTrace = ::debugLog,
+                onTrace = ::traceLog,
+                onState = ::debugLog,
+                traceFrames = DiagnosticLogging.traceEnabled,
                 onArtwork = ::onArtworkTransfer,
             )
             this.csm = csm
@@ -2531,7 +2497,20 @@ class CarPlayController(
     }
 
     private fun debugLog(message: String) {
-        Log.i(IphoneCarPlayConfiguration.TAG, message)
+        DiagnosticLogging.info(message)
+        forwardToUi(message)
+    }
+
+    /**
+     * Protocol traces: iAP2 frame dumps and AirPlay request/response bodies. They reach logcat only
+     * when the developer opted in (see [DiagnosticLogging]); the UI listener applies its own redaction.
+     */
+    private fun traceLog(message: String) {
+        DiagnosticLogging.trace(message)
+        forwardToUi(message)
+    }
+
+    private fun forwardToUi(message: String) {
         try {
             uiListener?.onDebugLog(message)
         } catch (error: Exception) {
@@ -2541,7 +2520,6 @@ class CarPlayController(
 
     private fun connectionDiagnostic(message: String) {
         try {
-            // The redactor reserves "PHONE " for private phone-side log captures.
             val diagnosticPhase = if (phase == Phase.IPHONE) "USB_DISCOVERY" else phase.name
             debugLog("$CONNECTION_DIAGNOSTIC_PREFIX attempt=$diagnosticAttempt run=${diagnosticRun.get()} phase=$diagnosticPhase $message")
         } catch (_: Exception) {
@@ -2556,14 +2534,8 @@ class CarPlayController(
         ((System.nanoTime() - startedNanos) / 1_000_000L).coerceAtLeast(0)
 
     private fun debugLog(message: String, error: Throwable) {
-        Log.w(IphoneCarPlayConfiguration.TAG, message, error)
-        try {
-            uiListener?.onDebugLog(
-                "$message: ${error.message ?: error.javaClass.simpleName}",
-            )
-        } catch (callbackError: Exception) {
-            Log.w(IphoneCarPlayConfiguration.TAG, "debug log callback failed", callbackError)
-        }
+        DiagnosticLogging.warn(message, error)
+        forwardToUi("$message: ${error.message ?: error.javaClass.simpleName}")
     }
 
     private fun onStatus(status: CarPlayStatus, generation: Int? = null) {

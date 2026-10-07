@@ -3,6 +3,7 @@ package com.shilapi.xcertplay
 import org.junit.Assert.*
 import org.junit.Test
 import java.nio.file.Files
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 class DiagnosticRedactorTest {
     @Test fun additionalTroubleshootingMetadataSurvivesSavedReportWithoutPayloads() {

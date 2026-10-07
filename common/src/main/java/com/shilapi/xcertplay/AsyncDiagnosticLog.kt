@@ -3,6 +3,7 @@ package com.shilapi.xcertplay
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 /** Queued entries retain only their exact file target and a redacted, bounded metadata string. */
 internal object AsyncDiagnosticLog {

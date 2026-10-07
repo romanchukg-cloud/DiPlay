@@ -20,6 +20,9 @@ enum class Iap2TraceDirection(val label: String) {
  * Known endpoints use their field names and wire types. Unknown/medium-confidence endpoints still
  * show ordered parameter IDs and safe scalar/string/byte summaries, so no frame is invisible just
  * because it has not received a strict schema yet.
+ *
+ * Fields marked [Iap2FieldSpec.sensitive] (Wi-Fi passphrases, NMEA positions) show only their byte
+ * count, and the raw hex preview is withheld for any endpoint that carries such a field.
  */
 object Iap2FrameFormatter {
     private const val MAX_PARAMETERS = 80
@@ -49,7 +52,11 @@ object Iap2FrameFormatter {
                 lines = lines,
             )
         }
-        lines += "  raw-body=${hexPreview(frame.payload)}"
+        lines += if (endpoint?.containsSensitive == true) {
+            "  raw-body=${redacted(frame.payload)}"
+        } else {
+            "  raw-body=${hexPreview(frame.payload)}"
+        }
 
         val endpointText = endpoint?.let { " ${it.name}" }.orEmpty()
         return buildString {
@@ -118,7 +125,9 @@ object Iap2FrameFormatter {
         spec: Iap2FieldSpec,
         depth: Int,
     ): String = try {
-        when (spec.type) {
+        if (spec.sensitive) {
+            redacted(payload)
+        } else when (spec.type) {
             Iap2WireType.VOID -> if (payload.isEmpty()) "void" else "void? ${hexPreview(payload)}"
             Iap2WireType.U8 -> scalar("u8", payload, 1, Iap2WireCodec.readU8(payload))
             Iap2WireType.I8 -> scalar("i8", payload, 1, Iap2WireCodec.readI8(payload))
@@ -169,6 +178,8 @@ object Iap2FrameFormatter {
 
     private fun bytes(payload: ByteArray): String =
         "bytes=${payload.size} [${hexPreview(payload)}]"
+
+    private fun redacted(payload: ByteArray): String = "<redacted ${payload.size}B>"
 
     private fun readableString(payload: ByteArray): String? {
         if (payload.isEmpty() || payload.last() != 0.toByte()) return null

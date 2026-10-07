@@ -1,7 +1,7 @@
-package com.shilapi.xcertplay
+package com.shilapi.xcertplay.diagnostics
 
 /** Diagnostics describe state transitions; protocol payloads and credentials are never exported. */
-internal object DiagnosticRedactor {
+object DiagnosticRedactor {
     private val secret = Regex("(?i)(pass(word|phrase)?|token|private.?key|certificate|pair.?record|ssid|body=|payload=|hex=)")
     private val mac = Regex("(?i)(?<![0-9a-f])(?:[0-9a-f]{2}:){5}[0-9a-f]{2}(?![0-9a-f])")
     private val identifier = Regex("(?i)\\b[0-9a-f]{24,}\\b|\\b[0-9a-f]{8}-[0-9a-f-]{27,}\\b")

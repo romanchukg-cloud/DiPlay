@@ -10,6 +10,7 @@ import org.mockito.Mockito.*
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
+import com.shilapi.xcertplay.diagnostics.DiagnosticRedactor
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [28])

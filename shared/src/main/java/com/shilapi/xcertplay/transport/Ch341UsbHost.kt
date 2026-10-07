@@ -1,5 +1,6 @@
 package com.shilapi.xcertplay.transport
 
+import com.shilapi.xcertplay.diagnostics.DiagnosticLogging
 import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -174,7 +175,9 @@ class Ch341UsbSession internal constructor(
     internal fun bulkWrite(data: ByteArray, timeoutMillis: Int) {
         val transferred = transfer(outputEndpoint, data, timeoutMillis, "write")
         if (transferred != data.size) {
-            Log.w(TAG, "bulk write sent $transferred of ${data.size} bytes: ${data.toHexPreview()}")
+            // The bytes are authentication-coprocessor traffic (certificates, challenges): traces only.
+            Log.w(TAG, "bulk write sent $transferred of ${data.size} bytes")
+            DiagnosticLogging.trace(TAG) { "bulk write data ${data.toHexPreview()}" }
             throw I2cTransportException.Protocol(
                 "CH341 bulk write transferred $transferred of ${data.size} bytes",
             )

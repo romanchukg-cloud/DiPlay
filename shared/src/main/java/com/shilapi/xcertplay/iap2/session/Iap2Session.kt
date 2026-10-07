@@ -22,12 +22,16 @@ class Iap2Session private constructor(
     private val channel: Iap2CsmChannel,
     private val traceContext: String,
     private val onTrace: (String) -> Unit,
+    /** Frame dumps carry credentials and positions; formatting them is skipped entirely when false. */
+    private val traceFrames: Boolean,
+    /** Session state (ready, closed, send or receive failures): no payload, so ordinary logs can keep it. */
+    private val onState: (String) -> Unit,
 ) : AutoCloseable {
     val isClosed: Boolean get() = channel.isClosed
 
     fun awaitReady(timeoutMillis: Long): Boolean {
         val ready = channel.awaitReady(timeoutMillis)
-        emitTrace("IAP2 READY [$traceContext] ready=$ready")
+        emitState("IAP2 READY [$traceContext] ready=$ready")
         return ready
     }
 
@@ -36,7 +40,7 @@ class Iap2Session private constructor(
             channel.send(frame, timeoutMillis)
             emitFrameTrace(Iap2TraceDirection.TX, frame)
         } catch (failure: Throwable) {
-            emitTrace(
+            emitState(
                 Iap2FrameFormatter.formatFailure(
                     Iap2TraceDirection.TX,
                     traceContext,
@@ -68,7 +72,7 @@ class Iap2Session private constructor(
         return try {
             channel.recv(timeoutMillis)?.also { emitFrameTrace(Iap2TraceDirection.RX, it) }
         } catch (failure: Throwable) {
-            emitTrace(
+            emitState(
                 Iap2FrameFormatter.formatFailure(
                     Iap2TraceDirection.RX,
                     traceContext,
@@ -86,11 +90,12 @@ class Iap2Session private constructor(
         try {
             channel.close()
         } finally {
-            emitTrace("IAP2 CLOSE [$traceContext]")
+            emitState("IAP2 CLOSE [$traceContext]")
         }
     }
 
     private fun emitFrameTrace(direction: Iap2TraceDirection, frame: Iap2Frame) {
+        if (!traceFrames) return
         try {
             emitTrace(Iap2FrameFormatter.format(direction, traceContext, frame))
         } catch (failure: Exception) {
@@ -113,6 +118,14 @@ class Iap2Session private constructor(
         }
     }
 
+    private fun emitState(message: String) {
+        try {
+            onState(message)
+        } catch (_: Exception) {
+            // Logging must never change protocol behavior.
+        }
+    }
+
     companion object {
         private const val DEFAULT_SEND_TIMEOUT_MILLIS = 5_000L
 
@@ -120,30 +133,38 @@ class Iap2Session private constructor(
             underlying: BlockingDuplexByteStream,
             traceContext: String = "wired",
             onTrace: (String) -> Unit = {},
+            traceFrames: Boolean = true,
+            onState: (String) -> Unit = onTrace,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
         ): Iap2Session =
-            Iap2Session(Iap2CsmChannel.open(underlying, onArtwork), traceContext, onTrace)
+            Iap2Session(Iap2CsmChannel.open(underlying, onArtwork), traceContext, onTrace, traceFrames, onState)
 
         fun openWireless(
             underlying: BlockingDuplexByteStream,
             traceContext: String = "wireless",
             onTrace: (String) -> Unit = {},
+            traceFrames: Boolean = true,
+            onState: (String) -> Unit = onTrace,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
         ): Iap2Session =
-            Iap2Session(Iap2CsmChannel.openWireless(underlying, onArtwork), traceContext, onTrace)
+            Iap2Session(Iap2CsmChannel.openWireless(underlying, onArtwork), traceContext, onTrace, traceFrames, onState)
 
         fun openTunnel(
             underlying: BlockingDuplexByteStream,
             traceContext: String = "wireless-tunnel",
             onTrace: (String) -> Unit = {},
+            traceFrames: Boolean = true,
+            onState: (String) -> Unit = onTrace,
             onArtwork: (Iap2ArtworkTransfer) -> Unit = {},
         ): Iap2Session =
-            Iap2Session(Iap2CsmChannel.openTunnel(underlying, onArtwork), traceContext, onTrace)
+            Iap2Session(Iap2CsmChannel.openTunnel(underlying, onArtwork), traceContext, onTrace, traceFrames, onState)
 
         fun wrap(
             channel: Iap2CsmChannel,
             traceContext: String = "iap2",
             onTrace: (String) -> Unit = {},
-        ): Iap2Session = Iap2Session(channel, traceContext, onTrace)
+            traceFrames: Boolean = true,
+            onState: (String) -> Unit = onTrace,
+        ): Iap2Session = Iap2Session(channel, traceContext, onTrace, traceFrames, onState)
     }
 }
